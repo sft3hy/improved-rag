@@ -1,0 +1,35 @@
+# Core dependencies
+streamlit>=1.28.0
+langchain>=0.1.0
+langchain-community>=0.0.20
+langchain-core>=0.1.0
+langchain-ollama>=0.1.0
+langchain-chroma>=0.1.0
+
+# Text processing
+langchain-text-splitters>=0.0.1
+
+# Vector database
+chromadb>=0.4.0
+
+# Data processing
+pandas>=1.5.0
+
+# Document processing
+PyPDF2>=3.0.0  # For PDF support
+python-docx>=0.8.11  # For Word documents
+python-pptx>=0.6.21  # For PowerPoint presentations
+openpyxl>=3.0.10  # For Excel files
+
+# Other utilities (built-in with Python)
+# sqlite3
+# logging
+# tempfile
+# io
+
+# Optional: For advanced text processing
+# spacy>=3.4.0
+# nltk>=3.8
+
+# Optional: For monitoring and debugging
+# watchdog  # For Streamlit auto-reload
