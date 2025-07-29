@@ -1,0 +1,7 @@
+# .streamlit/config.toml
+[server]
+maxUploadSize = 200
+maxMessageSize = 200
+
+[browser]
+gatherUsageStats = false

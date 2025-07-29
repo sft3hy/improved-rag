@@ -1,1 +1,16 @@
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv
+.env
+.DS_Store
+*.db
+data/
+.streamlit/secrets.toml
