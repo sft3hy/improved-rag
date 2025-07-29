@@ -253,3 +253,41 @@ class QueryOperations:
 
         conn.close()
         return queries
+
+
+class AdminOperations:
+    def __init__(self, db_manager: DatabaseManager):
+        self.db_manager = db_manager
+
+    def nuke_database(self):
+        """
+        Deletes all data from documents, document_chunks, and user_queries tables.
+        This will leave the tables intact but empty, ready for deployment.
+        """
+        conn = self.db_manager.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            print("Attempting to delete all queries, documents, and chunks...")
+
+            # The order of deletion is important due to foreign key constraints.
+            # (document_chunks has a foreign key to documents)
+            cursor.execute("DELETE FROM document_chunks;")
+            cursor.execute("DELETE FROM documents;")
+            cursor.execute("DELETE FROM user_queries;")
+
+            # Reset the auto-increment counters for the primary keys so new
+            # entries start from 1. This is good for a clean deployment state.
+            print("Resetting table primary key sequences...")
+            cursor.execute(
+                "DELETE FROM sqlite_sequence WHERE name IN ('documents', 'document_chunks', 'user_queries');"
+            )
+
+            conn.commit()
+            print("Database successfully nuked. All specified data has been deleted.")
+
+        except sqlite3.Error as e:
+            print(f"An error occurred: {e}")
+            conn.rollback()
+        finally:
+            conn.close()
