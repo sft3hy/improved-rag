@@ -16,7 +16,11 @@ def limit_model_input(input_str: str, max_len: int = 44000):
 
 
 class GroqLLMClient:
-    def __init__(self, api_key: str, model_name: str = "llama-3.3-70b-versatile"):
+    def __init__(
+        self,
+        api_key: str,
+        model_name: str = "meta-llama/llama-4-scout-17b-16e-instruct",
+    ):
         self.client = Groq(api_key=api_key)
         self.model_name = model_name
 

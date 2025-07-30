@@ -10,7 +10,7 @@ class Settings:
 
     # Model Configuration
     EMBEDDING_MODEL = "all-MiniLM-L6-v2"
-    LLM_MODEL = "llama-3.3-70b-versatile"
+    LLM_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
     # Chunking Configuration
     CHILD_CHUNK_SIZE = 250
