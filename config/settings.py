@@ -29,7 +29,7 @@ class Settings:
     DATABASE_PATH = "data/rag_database.db"
 
     # UI Configuration
-    MAX_UPLOAD_SIZE = 10  # MB
+    MAX_UPLOAD_SIZE = 50  # MB
 
 
 settings = Settings()

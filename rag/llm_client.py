@@ -24,7 +24,7 @@ class GroqLLMClient:
         self.client = Groq(api_key=api_key)
         self.model_name = model_name
 
-    def generate_multi_query(self, original_query: str) -> str:
+    def generate_multi_query(self, original_query: str) -> tuple[str, Dict[str, int]]:
         """Generate an alternative query for multi-query retrieval."""
         prompt = f"""Given the following user question, generate ONE alternative question that asks for the same information but uses different words and phrasing. The alternative question should help retrieve relevant documents that might not match the original query exactly.
 
@@ -52,8 +52,10 @@ Alternative question:"""
             )
 
             alternative_query = response.choices[0].message.content.strip()
+            token_usage = self.get_token_usage(response)
+
             logger.info(f"Generated alternative query: {alternative_query}")
-            return alternative_query
+            return alternative_query, token_usage
 
         except Exception as e:
             logger.error(f"Failed to generate alternative query: {e}")
@@ -113,7 +115,6 @@ Answer:"""
                         "role": "system",
                         "content": "You are a helpful assistant that answers questions based on provided context. Always cite which sources you used in your answer using [Source X] format.",
                     },
-                    # The final_prompt is now guaranteed to be within the size limit.
                     {"role": "user", "content": final_prompt},
                 ],
                 model=self.model_name,
@@ -122,9 +123,23 @@ Answer:"""
             )
 
             answer = response.choices[0].message.content.strip()
+            token_usage = self.get_token_usage(response)
             logger.info("Generated answer successfully")
-            return answer
+            return answer, token_usage
 
         except Exception as e:
             logger.error(f"Failed to generate answer: {e}")
-            return "I apologize, but I encountered an error while generating the answer. Please try again."
+            return (
+                "I apologize, but I encountered an error while generating the answer. Please try again.",
+                {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+            )
+
+    def get_token_usage(self, response) -> Dict[str, int]:
+        """Extract token usage from response."""
+        if hasattr(response, "usage") and response.usage:
+            return {
+                "prompt_tokens": response.usage.prompt_tokens,
+                "completion_tokens": response.usage.completion_tokens,
+                "total_tokens": response.usage.total_tokens,
+            }
+        return {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}

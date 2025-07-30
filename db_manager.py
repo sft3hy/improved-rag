@@ -1,8 +1,14 @@
 # main_nuke_script.py
 
 from database.models import DatabaseManager
-from database.operations import AdminOperations
+from database.operations import AdminOperations, QueryOperations
 from config.settings import settings
+
+db_manager = DatabaseManager(settings.DATABASE_PATH)
+
+admin_ops = AdminOperations(db_manager)
+
+query_ops = QueryOperations(db_manager)
 
 
 def run_nuke():
@@ -11,19 +17,22 @@ def run_nuke():
     """
     print("Starting database nuke operation...")
 
-    # 1. Initialize the DatabaseManager with the path from your settings.
-    #    This object handles the database connections.
-    db_manager = DatabaseManager(settings.DATABASE_PATH)
-
-    # 2. Initialize AdminOperations with the DatabaseManager instance.
-    admin_ops = AdminOperations(db_manager)
-
-    # 3. Now you can call the nuke_database method.
     admin_ops.nuke_database()
 
     print("Nuke operation script finished.")
 
 
+def remove_query():
+    query_ops.delete_query("3")
+
+
+def show_tokens():
+    print(query_ops.get_todays_total_tokens())
+
+
 if __name__ == "__main__":
     # This makes the script runnable from the command line.
-    run_nuke()
+    # run_nuke()
+    pass
+
+show_tokens()

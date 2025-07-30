@@ -13,6 +13,7 @@ class EnhancedRAGRetriever:
         self.embedding_manager = embedding_manager
         self.llm_client = llm_client
         self.config = config
+        self.total_tokens_used = 0
 
     def compute_similarity_scores(
         self,
@@ -163,18 +164,23 @@ class EnhancedRAGRetriever:
             logger.error(f"Error getting parent chunks: {e}")
             return []
 
-    def multi_query_retrieval(self, original_query: str, user_id: str) -> List[Dict]:
+    def multi_query_retrieval(
+        self, query: str, user_id: str
+    ) -> Tuple[List[Dict], Dict[str, int]]:
         """Perform multi-query retrieval using original and generated alternative query."""
         logger.info("Starting multi-query retrieval")
+        multi_query_tokens = {"total_tokens": 0}  # Initialize token tracking
 
         try:
             # Generate alternative query
-            alternative_query = self.llm_client.generate_multi_query(original_query)
+            alternative_query, multi_query_tokens = (
+                self.llm_client.generate_multi_query(query)
+            )
             logger.info(f"Generated alternative query: {alternative_query[:100]}...")
 
             # Retrieve child chunks for both queries
             original_child_chunks = self.retrieve_child_chunks(
-                original_query, user_id, self.config.INITIAL_RETRIEVAL_COUNT
+                query, user_id, self.config.INITIAL_RETRIEVAL_COUNT
             )
 
             alternative_child_chunks = self.retrieve_child_chunks(
@@ -213,11 +219,11 @@ class EnhancedRAGRetriever:
                     seen_ids.add(parent["chunk_id"])
 
             logger.info(f"Retrieved {len(combined_parents)} unique parent chunks")
-            return combined_parents
+            return combined_parents, multi_query_tokens
 
         except Exception as e:
             logger.error(f"Error in multi-query retrieval: {e}")
-            return []
+            return [], multi_query_tokens
 
     def final_reranking(self, query: str, parent_chunks: List[Dict]) -> List[Dict]:
         """Perform final reranking of parent chunks against original query."""
@@ -272,17 +278,20 @@ class EnhancedRAGRetriever:
 
     def retrieve_and_generate(
         self, query: str, user_id: str
-    ) -> Tuple[str, List[Dict], float]:
+    ) -> Tuple[str, List[Dict], float, int]:
         """Complete RAG pipeline: retrieve relevant chunks and generate answer."""
         import time
 
         start_time = time.time()
+        total_tokens = 0
 
         logger.info(f"Starting RAG retrieval for query: {query[:100]}...")
 
         try:
             # Step 1: Multi-query retrieval
-            parent_chunks = self.multi_query_retrieval(query, user_id)
+            parent_chunks, multi_query_tokens = self.multi_query_retrieval(
+                query, user_id
+            )
 
             if not parent_chunks:
                 logger.warning("No relevant chunks found")
@@ -291,6 +300,7 @@ class EnhancedRAGRetriever:
                     "I couldn't find relevant information to answer your question. Please try rephrasing your query or upload more documents.",
                     [],
                     processing_time,
+                    multi_query_tokens.get("total_tokens", 0),
                 )
 
             # Step 2: Final reranking
@@ -303,15 +313,22 @@ class EnhancedRAGRetriever:
                     "I couldn't find sufficiently relevant information to answer your question.",
                     [],
                     processing_time,
+                    multi_query_tokens.get("total_tokens", 0),
                 )
 
             # Step 3: Generate answer
-            answer = self.llm_client.generate_answer(query, final_chunks)
+            answer, answer_tokens = self.llm_client.generate_answer(query, final_chunks)
+
+            # Calculate total tokens used
+            total_tokens = multi_query_tokens.get(
+                "total_tokens", 0
+            ) + answer_tokens.get("total_tokens", 0)
 
             processing_time = time.time() - start_time
             logger.info(f"RAG retrieval completed in {processing_time:.2f} seconds")
+            logger.info(f"Total tokens used: {total_tokens}")
 
-            return answer, final_chunks, processing_time
+            return answer, final_chunks, processing_time, total_tokens
 
         except Exception as e:
             processing_time = time.time() - start_time
@@ -320,4 +337,5 @@ class EnhancedRAGRetriever:
                 f"An error occurred while processing your query: {str(e)}",
                 [],
                 processing_time,
+                0,
             )

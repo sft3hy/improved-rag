@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List, Dict, Any
 import json
 
@@ -59,10 +59,20 @@ class DatabaseManager:
                 user_id TEXT NOT NULL,
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 processing_time REAL,
-                chunks_used INTEGER
+                chunks_used INTEGER,
+                tokens_used INTEGER DEFAULT 0
             )
         """
         )
+
+        # Add tokens_used column if it doesn't exist (for existing databases)
+        try:
+            cursor.execute(
+                "ALTER TABLE user_queries ADD COLUMN tokens_used INTEGER DEFAULT 0"
+            )
+        except sqlite3.OperationalError:
+            # Column already exists
+            pass
 
         # Create indexes for better performance
         cursor.execute(
@@ -77,6 +87,9 @@ class DatabaseManager:
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_queries_user_id ON user_queries(user_id)"
         )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_queries_timestamp ON user_queries(timestamp)"
+        )
 
         conn.commit()
         conn.close()
@@ -84,3 +97,42 @@ class DatabaseManager:
     def get_connection(self):
         """Get database connection."""
         return sqlite3.connect(self.db_path)
+
+    def get_todays_total_tokens(self, user_id: Optional[str] = None) -> int:
+        """
+        Get the total number of tokens used today.
+
+        Args:
+            user_id: If provided, get tokens for specific user. If None, get total for all users.
+
+        Returns:
+            Total tokens used today
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        today = date.today().strftime("%Y-%m-%d")
+
+        if user_id:
+            cursor.execute(
+                """
+                SELECT COALESCE(SUM(tokens_used), 0)
+                FROM user_queries 
+                WHERE user_id = ? 
+                AND DATE(timestamp) = ?
+                """,
+                (user_id, today),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT COALESCE(SUM(tokens_used), 0)
+                FROM user_queries 
+                WHERE DATE(timestamp) = ?
+                """,
+                (today,),
+            )
+        total_tokens = cursor.fetchone()[0]
+        conn.close()
+
+        return total_tokens

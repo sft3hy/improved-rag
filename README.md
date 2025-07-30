@@ -7,7 +7,7 @@
 
 ## 🌟 Overview
 
-This Enhanced RAG system implements state-of-the-art retrieval-augmented generation techniques with sophisticated document preprocessing, hierarchical chunking, and multi-query retrieval strategies. Built for production use with Groq's Llama-3.3-70B and optimized for complex document understanding.
+This Enhanced RAG system implements state-of-the-art retrieval-augmented generation techniques with sophisticated document preprocessing, hierarchical chunking, and multi-query retrieval strategies. Built for production use with Groq's Llama-4-scout-17b-16e-instruct and optimized for complex document understanding.
 
 ## 🏗️ Advanced RAG Architecture
 
@@ -150,7 +150,7 @@ self.child_splitter = MarkdownTextSplitter(
 ```python
 def generate_multi_query(self, original_query: str) -> str:
     """
-    Uses Llama-3.3-70B to generate alternative queries:
+    Uses Llama-4-scout-17b-16e-instruct to generate alternative queries:
     
     Original: "What were the key financial metrics?"
     Alternative: "Which performance indicators and financial KPIs were most important?"
@@ -469,7 +469,7 @@ streamlit run app.py --server.address=0.0.0.0
 
 ## 🙏 Acknowledgments
 
-- **Groq** for fast LLM inference with Llama-3.3-70B
+- **Groq** for fast LLM inference with Llama-4-scout-17b-16e-instruct
 - **Sentence Transformers** for efficient embedding generation
 - **LangChain** for production-ready text splitting
 - **Streamlit** for rapid prototype-to-production deployment

@@ -4,6 +4,8 @@ import time
 from datetime import datetime
 import logging
 import traceback
+import json
+from datetime import datetime, date
 
 # Import project modules
 from config.settings import settings
@@ -14,6 +16,7 @@ from rag.chunking import DocumentChunker
 from rag.llm_client import GroqLLMClient
 from rag.retrieval import EnhancedRAGRetriever
 from utils.document_processor import EnhancedDocumentProcessor
+from utils.streamlit_utils import float_to_percent
 
 # Configure logging
 logging.basicConfig(
@@ -37,6 +40,11 @@ if "user_id" not in st.session_state:
 
 if "initialized" not in st.session_state:
     st.session_state.initialized = False
+
+# Load messages from database only once
+if "messages_loaded" not in st.session_state:
+    st.session_state.messages = []
+    st.session_state.messages_loaded = False
 
 
 # Initialize system components
@@ -99,6 +107,27 @@ if not st.session_state.initialized:
 
 # Get components
 components = st.session_state.components
+
+
+def load_chat_history():
+    """Load all queries from the database and format for display."""
+    if not st.session_state.messages_loaded:
+        all_queries = components["query_ops"].get_all_queries(limit=100)
+        for query_data in all_queries:
+            # Add user's query
+            st.session_state.messages.append(
+                {"role": "user", "content": query_data["user_query"]}
+            )
+            # Add assistant's answer
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": query_data["content"],
+                    "sources": json.loads(query_data.get("answer_sources_used", [])),
+                    "processing_time": query_data.get("processing_time"),
+                }
+            )
+        st.session_state.messages_loaded = True
 
 
 def process_document_upload(uploaded_file):
@@ -177,45 +206,38 @@ def process_document_upload(uploaded_file):
 
 
 def display_sources(sources):
-    """Display sources in a formatted way."""
+    """
+    Displays sources in a stylish and structured format in Streamlit.
+    """
     if not sources:
-        st.info("No sources found.")
         return
 
-    with st.expander(f"📚 Sources Used ({len(sources)} chunks)", expanded=False):
+    with st.expander(f"📚 Sources Used ({len(sources)} Chunks)", expanded=False):
         for i, source in enumerate(sources, 1):
-            # Handle different possible source structures
-            header = (
-                source.get("contextual_header") or source.get("header") or f"Source {i}"
-            )
+            source_breadcrumb = source.get("source_breadcrumb", f"Source Chunk {i}")
+            header_content = source.get("contextual_header", "No Header Available")
+            text_content = source.get("chunk_text", "Content not available.")
 
-            # Try different possible text keys
-            text_content = (
-                source.get("text")
-                or source.get("text")
-                or source.get("content")
-                or "Content not available"
-            )
+            st.markdown(f"<h6>📄 {source_breadcrumb}</h6>", unsafe_allow_html=True)
+            st.subheader("Breadcrumb: " + header_content)
+            st.markdown("##### **Chunk Text:**")
+            st.markdown(f"> {text_content}", unsafe_allow_html=True)
 
-            st.markdown(f"**Source {i}: {header}**")
-
-            # Display truncated text
-            if len(text_content) > 500:
-                st.markdown(text_content[:500] + "...")
-            else:
-                st.markdown(text_content)
-
-            # Display relevance score if available
-            relevance_score = source.get("relevance_score") or source.get("score")
-            if relevance_score is not None:
-                st.caption(f"Relevance: {relevance_score:.3f}")
-
-            # Display additional metadata if available
+            relevance_score = source.get("relevance_score")
             chunk_id = source.get("chunk_id")
-            if chunk_id:
-                st.caption(f"Chunk ID: {chunk_id}")
 
-            if i < len(sources):  # Don't add divider after last source
+            if relevance_score is not None or chunk_id:
+                meta_cols = st.columns(2)
+                if relevance_score is not None:
+                    with meta_cols[0]:
+                        st.caption("Relevance Score:")
+                        st.write(float_to_percent(relevance_score))
+                if chunk_id:
+                    with meta_cols[1]:
+                        st.caption("Chunk ID:")
+                        st.markdown(f"`{chunk_id}`")
+
+            if i < len(sources):
                 st.divider()
 
 
@@ -255,14 +277,37 @@ def format_file_size(size_bytes):
         return f"{size_bytes/(1024*1024):.1f} MB"
 
 
+def get_daily_token_usage():
+    """Get today's token usage from session state."""
+    return components["query_ops"].get_todays_total_tokens()
+
+
+def recalculate_tokens():
+    daily_tokens = get_daily_token_usage()
+    # print(daily_tokens)
+    token_limit = 500000
+    progress_percentage = min(daily_tokens / token_limit, 1.0)
+
+    st.markdown("**Daily Token Usage**")
+    st.progress(progress_percentage)
+    st.caption(f"{daily_tokens:,} / 500k tokens ({progress_percentage*100:.1f}%)")
+    if progress_percentage > 0.8:
+        st.warning("⚠️ Approaching daily limit!")
+    elif progress_percentage >= 1.0:
+        st.error("🚫 Daily limit reached!")
+
+
 def main():
     """Main application interface."""
 
     # Header
-    st.title("🔍 Enhanced RAG System")
-    st.markdown(
-        "*Advanced Retrieval-Augmented Generation with Multi-Query and Parent-Child Chunking*"
-    )
+    # Token usage display
+    with st.sidebar:
+        st.header("🔍 Enhanced RAG System")
+        st.markdown(
+            "*Advanced Retrieval-Augmented Generation with Multi-Query and Parent-Child Chunking*"
+        )
+        recalculate_tokens()
 
     # Sidebar for document management
     with st.sidebar:
@@ -272,7 +317,6 @@ def main():
         uploaded_files = st.file_uploader(
             "Upload Documents",
             type=[
-                # Text files
                 "txt",
                 "md",
                 "rst",
@@ -280,7 +324,6 @@ def main():
                 "cfg",
                 "ini",
                 "conf",
-                # Code files
                 "py",
                 "js",
                 "html",
@@ -298,22 +341,18 @@ def main():
                 "go",
                 "rs",
                 "sql",
-                # Office documents
                 "pdf",
                 "docx",
                 "doc",
                 "pptx",
                 "ppt",
-                # Spreadsheets
                 "xlsx",
                 "xls",
                 "csv",
                 "tsv",
-                # Email and web
                 "eml",
                 "htm",
                 "xhtml",
-                # Other formats
                 "rtf",
             ],
             accept_multiple_files=True,
@@ -321,21 +360,16 @@ def main():
         )
 
         if uploaded_files:
-            # Show file summary
             file_types = {}
             total_size = 0
-
             for file in uploaded_files:
-                file.seek(0, 2)  # Go to end of file
+                file.seek(0, 2)
                 file_size = file.tell()
-                file.seek(0)  # Reset to beginning
+                file.seek(0)
                 total_size += file_size
-
-                # Get file extension
                 file_ext = os.path.splitext(file.name)[1].lower()
                 file_types[file_ext] = file_types.get(file_ext, 0) + 1
 
-            # Display file summary
             st.info(
                 f"📊 **{len(uploaded_files)} files selected** ({format_file_size(total_size)})"
             )
@@ -344,97 +378,113 @@ def main():
                 emoji = get_file_type_emoji(file_type)
                 st.caption(f"{emoji} {count}x {file_type.upper()[1:]} files")
 
-            # Process files button
             if st.button("Process All Files", type="primary"):
                 success_count = 0
                 failed_files = []
-
-                # Create progress indicators
                 progress_bar = st.progress(0)
                 status_text = st.empty()
-
                 for i, uploaded_file in enumerate(uploaded_files):
                     status_text.text(f"Processing {uploaded_file.name}...")
                     progress_bar.progress((i + 1) / len(uploaded_files))
-
                     if process_document_upload(uploaded_file):
                         success_count += 1
                     else:
                         failed_files.append(uploaded_file.name)
-
-                # Clear progress indicators
                 progress_bar.empty()
                 status_text.empty()
-
-                # Show results
                 if success_count > 0:
                     st.success(
                         f"✅ Successfully processed {success_count}/{len(uploaded_files)} files"
                     )
-
                 if failed_files:
                     st.error(f"❌ Failed to process {len(failed_files)} files:")
                     for failed_file in failed_files:
                         st.caption(f"• {failed_file}")
-
-                # Refresh the page to show new documents
                 if success_count > 0:
                     st.rerun()
 
         st.divider()
 
-        # Show user documents
         st.subheader("📄 Your Documents")
         user_docs = components["doc_ops"].get_user_documents(st.session_state.user_id)
-
         if user_docs:
             st.metric("Total Documents", len(user_docs))
-
-            # Show recent documents
             st.caption("**Recent uploads:**")
-            for doc in user_docs[:10]:  # Show last 10 documents
+            for doc in user_docs[:10]:
                 status = "✅" if doc["processed"] else "⏳"
                 file_ext = doc.get("file_type", "")
                 emoji = get_file_type_emoji(file_ext)
                 size_display = format_file_size(doc.get("file_size", 0))
-
                 st.caption(f"{status} {emoji} {doc['document_name']} ({size_display})")
         else:
             st.info("No documents uploaded yet")
             st.caption("💡 Upload documents to get started!")
 
-    # Main content area
-    col1, col2 = st.columns([2, 1])
+        st.divider()
 
-    with col1:
-        st.header("💬 Ask Questions")
+        st.subheader("📈 System Stats")
+        try:
+            total_docs = len(user_docs) if user_docs else 0
+            processed_docs = (
+                len([doc for doc in user_docs if doc.get("processed", False)])
+                if user_docs
+                else 0
+            )
+            # Get total query count from all users
+            total_queries = len(
+                components["query_ops"].get_all_queries()
+            )  # Assumes you add a get_query_count method
+            st.metric("Total Documents", total_docs)
+            st.metric("Processed Documents", processed_docs)
+            st.metric("Total Queries (All Users)", total_queries)
+            if total_docs > 0:
+                processing_rate = (processed_docs / total_docs) * 100
+                st.metric("Processing Rate", f"{processing_rate:.1f}%")
+        except Exception as e:
+            logger.error(f"Error calculating system stats: {e}")
+            st.error("Error loading system statistics")
 
-        # Query input
-        query = st.text_area(
-            "Enter your question:",
-            height=100,
-            placeholder="Ask anything about your uploaded documents...",
-            help="Type your question and click Search to get AI-powered answers from your documents.",
-        )
+    # ---- Main content area - Chat interface ----
 
-        # Search button
-        search_button = st.button(
-            "🔍 Search", type="primary", disabled=not query.strip()
-        )
+    # Load history from DB on first run
+    load_chat_history()
 
-        if search_button:
-            if not user_docs:
-                st.warning("⚠️ Please upload some documents first!")
-            else:
+    # Display chat messages from history
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+            if message["role"] == "assistant":
+                if "sources" in message and message["sources"]:
+                    display_sources(message["sources"])
+                if (
+                    "processing_time" in message
+                    and message["processing_time"] is not None
+                ):
+                    tokens_info = ""
+                    if "tokens_used" in message and message["tokens_used"]:
+                        tokens_info = f" | 🔢 Tokens used: {message['tokens_used']:,}"
+                    st.caption(
+                        f"⏱️ Processing time: {message['processing_time']:.2f} seconds{tokens_info}"
+                    )
+
+    # Accept user input
+    if query := st.chat_input("Ask anything about your uploaded documents..."):
+        # Add user message to chat history and display
+        st.session_state.messages.append({"role": "user", "content": query})
+        with st.chat_message("user"):
+            st.markdown(query)
+
+        if not user_docs:
+            st.warning("⚠️ Please upload some documents first!")
+        else:
+            with st.chat_message("assistant"):
                 with st.spinner("🤖 Searching and generating answer..."):
                     try:
-                        # Perform retrieval and generation
                         start_time = time.time()
-                        answer, sources, processing_time = components[
+                        answer, sources, processing_time, total_tokens = components[
                             "retriever"
                         ].retrieve_and_generate(query, st.session_state.user_id)
 
-                        # Store query in database
                         source_info = []
                         if sources:
                             for source in sources:
@@ -448,6 +498,7 @@ def main():
                                         "relevance_score": source.get(
                                             "relevance_score", 0.0
                                         ),
+                                        "chunk_text": source.get("chunk_text"),
                                     }
                                 )
 
@@ -458,105 +509,36 @@ def main():
                             user_id=st.session_state.user_id,
                             processing_time=processing_time,
                             chunks_used=len(sources) if sources else 0,
+                            tokens_used=total_tokens,
                         )
+                        recalculate_tokens()
 
-                        # Display results
-                        st.subheader("📝 Answer")
-                        st.write(answer)
-
-                        # Display sources
+                        # Display and store assistant response
+                        st.markdown(answer)
                         if sources:
                             display_sources(sources)
-                        else:
-                            st.info("No specific sources were used for this answer.")
+                        st.caption(
+                            f"⏱️ Processing time: {processing_time:.2f} seconds | 🔢 Tokens used: {total_tokens:,}"
+                        )
 
-                        # Show processing time
-                        st.caption(f"⏱️ Processing time: {processing_time:.2f} seconds")
+                        st.session_state.messages.append(
+                            {
+                                "role": "assistant",
+                                "content": answer,
+                                "sources": sources,
+                                "processing_time": processing_time,
+                                "tokens_used": total_tokens,
+                            }
+                        )
 
                     except Exception as e:
+                        error_message = f"❌ An error occurred while processing your query: {str(e)}"
                         logger.error(f"Error during retrieval: {e}")
                         logger.error(traceback.format_exc())
-                        st.error(
-                            f"❌ An error occurred while processing your query: {str(e)}"
+                        st.error(error_message)
+                        st.session_state.messages.append(
+                            {"role": "assistant", "content": error_message}
                         )
-                        st.caption(
-                            "Please check the logs for more details or try a different question."
-                        )
-
-    with col2:
-        st.header("📊 Recent Queries")
-
-        # Show recent queries
-        try:
-            recent_queries = components["query_ops"].get_user_queries(
-                st.session_state.user_id, limit=5
-            )
-
-            if recent_queries:
-                for query_data in recent_queries:
-                    # Truncate long queries for display
-                    query_preview = (
-                        query_data["user_query"][:50] + "..."
-                        if len(query_data["user_query"]) > 50
-                        else query_data["user_query"]
-                    )
-
-                    with st.expander(f"Q: {query_preview}"):
-                        st.write("**Question:**")
-                        st.write(query_data["user_query"])
-
-                        st.write("**Answer:**")
-                        answer_preview = (
-                            query_data["answer_text"][:300] + "..."
-                            if len(query_data["answer_text"]) > 300
-                            else query_data["answer_text"]
-                        )
-                        st.write(answer_preview)
-
-                        # Show metadata
-                        chunks_used = query_data.get("chunks_used", 0)
-                        processing_time = query_data.get("processing_time", 0)
-                        timestamp = query_data.get("timestamp", "Unknown")
-
-                        st.caption(
-                            f"📚 Sources: {chunks_used} | ⏱️ Time: {processing_time:.2f}s"
-                        )
-                        st.caption(f"🕒 Asked: {timestamp}")
-            else:
-                st.info("No queries yet")
-                st.caption("Ask a question to see your query history here!")
-
-        except Exception as e:
-            logger.error(f"Error loading recent queries: {e}")
-            st.error(f"Error loading recent queries: {str(e)}")
-
-        st.divider()
-
-        # System stats
-        st.subheader("📈 System Stats")
-        try:
-            total_docs = len(user_docs) if user_docs else 0
-            processed_docs = (
-                len([doc for doc in user_docs if doc.get("processed", False)])
-                if user_docs
-                else 0
-            )
-            recent_queries_count = (
-                len(recent_queries) if "recent_queries" in locals() else 0
-            )
-
-            st.metric("Total Documents", total_docs)
-            st.metric("Processed Documents", processed_docs)
-            st.metric("Recent Queries", recent_queries_count)
-
-            # Show processing status if applicable
-            if total_docs > 0:
-                processing_rate = (processed_docs / total_docs) * 100
-                st.metric("Processing Rate", f"{processing_rate:.1f}%")
-
-        except Exception as e:
-            logger.error(f"Error calculating system stats: {e}")
-            st.error("Error loading system statistics")
 
 
 if __name__ == "__main__":

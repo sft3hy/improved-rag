@@ -179,6 +179,16 @@ class QueryOperations:
     def __init__(self, db_manager: DatabaseManager):
         self.db_manager = db_manager
 
+    def delete_query(self, query_id: int):
+        """Delete a query by ID."""
+        conn = self.db_manager.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM user_queries WHERE query_id = ?", (query_id,))
+
+        conn.commit()
+        conn.close()
+        print(f"Deleted query with id {query_id}")
+
     def insert_query(
         self,
         user_query: str,
@@ -187,6 +197,7 @@ class QueryOperations:
         user_id: str,
         processing_time: float,
         chunks_used: int,
+        tokens_used: int = 0,
     ) -> int:
         """Insert a user query and its answer."""
         conn = self.db_manager.get_connection()
@@ -198,8 +209,8 @@ class QueryOperations:
         cursor.execute(
             """
             INSERT INTO user_queries 
-            (user_query, answer_text, answer_sources_used, user_id, processing_time, chunks_used)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (user_query, answer_text, answer_sources_used, user_id, processing_time, chunks_used, tokens_used)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 user_query,
@@ -208,6 +219,7 @@ class QueryOperations:
                 user_id,
                 processing_time,
                 chunks_used,
+                tokens_used,
             ),
         )
 
@@ -225,7 +237,7 @@ class QueryOperations:
         cursor.execute(
             """
             SELECT query_id, user_query, answer_text, answer_sources_used, 
-                   timestamp, processing_time, chunks_used
+                   timestamp, processing_time, chunks_used, tokens_used
             FROM user_queries 
             WHERE user_id = ?
             ORDER BY timestamp DESC
@@ -248,11 +260,61 @@ class QueryOperations:
                     "timestamp": row[4],
                     "processing_time": row[5],
                     "chunks_used": row[6],
+                    "tokens_used": row[7],
                 }
             )
 
         conn.close()
         return queries
+
+    def get_all_queries(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get all recent queries from all users."""
+        conn = self.db_manager.get_connection()
+        # Use row factory to easily convert to dictionary
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT query_id, user_query, answer_text, answer_sources_used,
+                timestamp, processing_time, chunks_used, user_id, tokens_used
+            FROM user_queries
+            ORDER BY timestamp ASC
+            LIMIT ?
+        """,
+            (limit,),
+        )
+
+        queries = []
+        for row in cursor.fetchall():
+            query_dict = dict(row)
+            # Parse sources JSON
+            if query_dict.get("answer_sources_used"):
+                query_dict["answer_sources"] = json.loads(
+                    query_dict["answer_sources_used"]
+                )
+            else:
+                query_dict["answer_sources"] = []
+
+            # For clarity, rename the key
+            query_dict["content"] = query_dict.pop("answer_text")
+
+            queries.append(query_dict)
+
+        conn.close()
+        return queries
+
+    def get_todays_total_tokens(self, user_id: Optional[str] = None) -> int:
+        """
+        Get the total number of tokens used today.
+
+        Args:
+            user_id: If provided, get tokens for specific user. If None, get total for all users.
+
+        Returns:
+            Total tokens used today
+        """
+        return self.db_manager.get_todays_total_tokens(user_id)
 
 
 class AdminOperations:
@@ -291,3 +353,32 @@ class AdminOperations:
             conn.rollback()
         finally:
             conn.close()
+
+    def get_database_stats(self) -> Dict[str, Any]:
+        """Get statistics about the database."""
+        conn = self.db_manager.get_connection()
+        cursor = conn.cursor()
+
+        stats = {}
+
+        # Count documents
+        cursor.execute("SELECT COUNT(*) FROM documents")
+        stats["total_documents"] = cursor.fetchone()[0]
+
+        # Count chunks
+        cursor.execute("SELECT COUNT(*) FROM document_chunks")
+        stats["total_chunks"] = cursor.fetchone()[0]
+
+        # Count queries
+        cursor.execute("SELECT COUNT(*) FROM user_queries")
+        stats["total_queries"] = cursor.fetchone()[0]
+
+        # Total tokens used
+        cursor.execute("SELECT COALESCE(SUM(tokens_used), 0) FROM user_queries")
+        stats["total_tokens_used"] = cursor.fetchone()[0]
+
+        # Tokens used today
+        stats["tokens_used_today"] = self.db_manager.get_todays_total_tokens()
+
+        conn.close()
+        return stats
