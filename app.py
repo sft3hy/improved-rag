@@ -285,12 +285,13 @@ def get_daily_token_usage():
 def recalculate_tokens():
     daily_tokens = get_daily_token_usage()
     # print(daily_tokens)
+    # print(daily_tokens)
     token_limit = 500000
     progress_percentage = min(daily_tokens / token_limit, 1.0)
 
     st.markdown("**Daily Token Usage**")
     st.progress(progress_percentage)
-    st.caption(f"{daily_tokens:,} / 500k tokens ({progress_percentage*100:.1f}%)")
+    st.caption(f"{daily_tokens:,} / 500k tokens used ({progress_percentage*100:.1f}%)")
     if progress_percentage > 0.8:
         st.warning("⚠️ Approaching daily limit!")
     elif progress_percentage >= 1.0:
@@ -511,7 +512,6 @@ def main():
                             chunks_used=len(sources) if sources else 0,
                             tokens_used=total_tokens,
                         )
-                        recalculate_tokens()
 
                         # Display and store assistant response
                         st.markdown(answer)
@@ -530,6 +530,8 @@ def main():
                                 "tokens_used": total_tokens,
                             }
                         )
+                        recalculate_tokens()
+                        st.rerun()
 
                     except Exception as e:
                         error_message = f"❌ An error occurred while processing your query: {str(e)}"
