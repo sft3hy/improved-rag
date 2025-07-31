@@ -453,7 +453,6 @@ def main():
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
-            print(message.keys())
             if message["role"] == "assistant":
                 if "sources" in message and message["sources"]:
                     display_sources(message["sources"])
@@ -462,7 +461,6 @@ def main():
                     and message["processing_time"] is not None
                 ):
                     tokens_info = ""
-                    print(message["content"])
                     if "tokens_used" in message and message["tokens_used"]:
                         tokens_info = f" | 🔢 Tokens used: {message['tokens_used']:,}"
                     st.caption(
