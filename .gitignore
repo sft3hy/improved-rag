@@ -11,6 +11,4 @@ venv.bak/
 .venv
 .env
 .DS_Store
-*.db
-data/
 .streamlit/secrets.toml
