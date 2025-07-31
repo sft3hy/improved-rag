@@ -100,7 +100,7 @@ class DatabaseManager:
 
     def get_todays_total_tokens(self, user_id: Optional[str] = None) -> int:
         """
-        Get the total number of tokens used today.
+        Get the total number of tokens used today (local time).
 
         Args:
             user_id: If provided, get tokens for specific user. If None, get total for all users.
@@ -111,28 +111,27 @@ class DatabaseManager:
         conn = self.get_connection()
         cursor = conn.cursor()
 
-        today = date.today().strftime("%Y-%m-%d")
-
         if user_id:
             cursor.execute(
                 """
                 SELECT COALESCE(SUM(tokens_used), 0)
                 FROM user_queries 
                 WHERE user_id = ? 
-                AND DATE(timestamp) = ?
+                AND DATE(timestamp, 'localtime') = DATE('now', 'localtime')
                 """,
-                (user_id, today),
+                (user_id,),
             )
         else:
             cursor.execute(
                 """
                 SELECT COALESCE(SUM(tokens_used), 0)
                 FROM user_queries 
-                WHERE DATE(timestamp) = ?
-                """,
-                (today,),
+                WHERE DATE(timestamp, 'localtime') = DATE('now', 'localtime')
+                """
             )
+        # print(cursor.fetchall())
         total_tokens = cursor.fetchone()[0]
         conn.close()
+        # print(total_tokens)
 
         return total_tokens
