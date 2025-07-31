@@ -125,6 +125,7 @@ def load_chat_history():
                     "content": query_data["content"],
                     "sources": json.loads(query_data.get("answer_sources_used", [])),
                     "processing_time": query_data.get("processing_time"),
+                    "tokens_used": query_data.get("tokens_used", 0),
                 }
             )
         st.session_state.messages_loaded = True
@@ -284,8 +285,6 @@ def get_daily_token_usage():
 
 def recalculate_tokens():
     daily_tokens = get_daily_token_usage()
-    # print(daily_tokens)
-    # print(daily_tokens)
     token_limit = 500000
     progress_percentage = min(daily_tokens / token_limit, 1.0)
 
@@ -454,6 +453,7 @@ def main():
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
+            print(message.keys())
             if message["role"] == "assistant":
                 if "sources" in message and message["sources"]:
                     display_sources(message["sources"])
@@ -462,6 +462,7 @@ def main():
                     and message["processing_time"] is not None
                 ):
                     tokens_info = ""
+                    print(message["content"])
                     if "tokens_used" in message and message["tokens_used"]:
                         tokens_info = f" | 🔢 Tokens used: {message['tokens_used']:,}"
                     st.caption(
