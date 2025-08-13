@@ -31,5 +31,8 @@ class Settings:
     # UI Configuration
     MAX_UPLOAD_SIZE = 20  # MB
 
+    # Locally or deployed
+    TEST = os.getenv("TEST_LOCAL")
+
 
 settings = Settings()

@@ -9,8 +9,13 @@ from datetime import datetime, date
 
 # Import project modules
 from config.settings import settings
-from database.models import DatabaseManager
-from database.operations import DocumentOperations, QueryOperations
+
+if settings.TEST == "True":
+    from database.models import DatabaseManager
+    from database.operations import DocumentOperations, QueryOperations
+else:
+    from database.models_cvdb import DatabaseManager
+    from database.operations_cvdb import DocumentOperations, QueryOperations
 from rag.embeddings import EmbeddingManager
 from rag.chunking import DocumentChunker
 from rag.llm_client import GroqLLMClient
@@ -219,10 +224,10 @@ def display_sources(sources):
             header_content = source.get("contextual_header", "No Header Available")
             text_content = source.get("chunk_text", "Content not available.")
 
-            st.markdown(f"<h6>📄 {source_breadcrumb}</h6>", unsafe_allow_html=True)
+            st.write(f"<h6>📄 {source_breadcrumb}</h6>", unsafe_allow_html=True)
             st.subheader("Breadcrumb: " + header_content)
-            st.markdown("##### **Chunk Text:**")
-            st.markdown(f"> {text_content}", unsafe_allow_html=True)
+            st.write("##### **Chunk Text:**")
+            st.write(f"> {text_content}", unsafe_allow_html=True)
 
             relevance_score = source.get("relevance_score")
             chunk_id = source.get("chunk_id")
@@ -236,7 +241,7 @@ def display_sources(sources):
                 if chunk_id:
                     with meta_cols[1]:
                         st.caption("Chunk ID:")
-                        st.markdown(f"`{chunk_id}`")
+                        st.write(f"`{chunk_id}`")
 
             if i < len(sources):
                 st.divider()
@@ -288,7 +293,7 @@ def recalculate_tokens():
     token_limit = 500000
     progress_percentage = min(daily_tokens / token_limit, 1.0)
 
-    st.markdown("**Daily Token Usage**")
+    st.write("**Daily Token Usage**")
     st.progress(progress_percentage)
     st.caption(f"{daily_tokens:,} / 500k tokens used ({progress_percentage*100:.1f}%)")
     if progress_percentage > 0.8:
@@ -304,7 +309,7 @@ def main():
     # Token usage display
     with st.sidebar:
         st.header("🔍 Enhanced RAG System")
-        st.markdown(
+        st.write(
             "*Advanced Retrieval-Augmented Generation with Multi-Query and Parent-Child Chunking*"
         )
         recalculate_tokens()
@@ -452,7 +457,7 @@ def main():
     # Display chat messages from history
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+            st.write(message["content"])
             if message["role"] == "assistant":
                 if "sources" in message and message["sources"]:
                     display_sources(message["sources"])
@@ -472,7 +477,7 @@ def main():
         # Add user message to chat history and display
         st.session_state.messages.append({"role": "user", "content": query})
         with st.chat_message("user"):
-            st.markdown(query)
+            st.write(query)
 
         if not user_docs:
             st.warning("⚠️ Please upload some documents first!")
@@ -513,7 +518,7 @@ def main():
                         )
 
                         # Display and store assistant response
-                        st.markdown(answer)
+                        st.write(answer)
                         if sources:
                             display_sources(sources)
                         st.caption(
