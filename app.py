@@ -59,31 +59,98 @@ def initialize_system():
     try:
         # Check API key
         if not settings.GROQ_API_KEY:
-            st.error("GROQ_API_KEY environment variable is not set!")
+            error_msg = "GROQ_API_KEY environment variable is not set!"
+            logger.error(error_msg)
+            st.error(error_msg)
             st.stop()
 
         # Create data directory if it doesn't exist
-        os.makedirs("data", exist_ok=True)
+        try:
+            os.makedirs("data", exist_ok=True)
+        except Exception as e:
+            error_msg = f"Failed to create data directory: {str(e)}"
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
+            st.error(
+                f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+            )
+            st.stop()
 
         # Initialize components
-        db_manager = DatabaseManager(settings.DATABASE_PATH)
-        doc_ops = DocumentOperations(db_manager)
-        query_ops = QueryOperations(db_manager)
+        try:
+            db_manager = DatabaseManager(settings.DATABASE_PATH)
+            doc_ops = DocumentOperations(db_manager)
+            query_ops = QueryOperations(db_manager)
+        except Exception as e:
+            error_msg = f"Failed to initialize database components: {str(e)}"
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
+            st.error(
+                f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+            )
+            st.stop()
 
-        embedding_manager = EmbeddingManager(settings.EMBEDDING_MODEL)
-        document_chunker = DocumentChunker(
-            child_chunk_size=settings.CHILD_CHUNK_SIZE,
-            parent_chunk_size=settings.PARENT_CHUNK_SIZE,
-            contextual_header_size=settings.CONTEXTUAL_HEADER_SIZE,
-            chunk_overlap=settings.CHUNK_OVERLAP,
-        )
+        try:
+            embedding_manager = EmbeddingManager(settings.EMBEDDING_MODEL)
+        except Exception as e:
+            error_msg = f"Failed to initialize embedding manager: {str(e)}"
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
+            st.error(
+                f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+            )
+            st.stop()
 
-        llm_client = GroqLLMClient(settings.GROQ_API_KEY, settings.LLM_MODEL)
-        document_processor = EnhancedDocumentProcessor()
+        try:
+            document_chunker = DocumentChunker(
+                child_chunk_size=settings.CHILD_CHUNK_SIZE,
+                parent_chunk_size=settings.PARENT_CHUNK_SIZE,
+                contextual_header_size=settings.CONTEXTUAL_HEADER_SIZE,
+                chunk_overlap=settings.CHUNK_OVERLAP,
+            )
+        except Exception as e:
+            error_msg = f"Failed to initialize document chunker: {str(e)}"
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
+            st.error(
+                f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+            )
+            st.stop()
 
-        retriever = EnhancedRAGRetriever(
-            doc_ops, embedding_manager, llm_client, settings
-        )
+        try:
+            llm_client = GroqLLMClient(settings.GROQ_API_KEY, settings.LLM_MODEL)
+        except Exception as e:
+            error_msg = f"Failed to initialize LLM client: {str(e)}"
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
+            st.error(
+                f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+            )
+            st.stop()
+
+        try:
+            document_processor = EnhancedDocumentProcessor()
+        except Exception as e:
+            error_msg = f"Failed to initialize document processor: {str(e)}"
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
+            st.error(
+                f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+            )
+            st.stop()
+
+        try:
+            retriever = EnhancedRAGRetriever(
+                doc_ops, embedding_manager, llm_client, settings
+            )
+        except Exception as e:
+            error_msg = f"Failed to initialize RAG retriever: {str(e)}"
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
+            st.error(
+                f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+            )
+            st.stop()
 
         logger.info("System initialized successfully")
 
@@ -99,8 +166,10 @@ def initialize_system():
         }
 
     except Exception as e:
-        logger.error(f"Failed to initialize system: {e}")
-        st.error(f"System initialization failed: {e}")
+        error_msg = f"Failed to initialize system: {str(e)}"
+        logger.error(error_msg)
+        logger.error(traceback.format_exc())
+        st.error(f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```")
         st.stop()
 
 
@@ -117,23 +186,36 @@ components = st.session_state.components
 def load_chat_history():
     """Load all queries from the database and format for display."""
     if not st.session_state.messages_loaded:
-        all_queries = components["query_ops"].get_all_queries(limit=100)
-        for query_data in all_queries:
-            # Add user's query
-            st.session_state.messages.append(
-                {"role": "user", "content": query_data["user_query"]}
+        try:
+            all_queries = components["query_ops"].get_all_queries(limit=100)
+            for query_data in all_queries:
+                # Add user's query
+                st.session_state.messages.append(
+                    {"role": "user", "content": query_data["user_query"]}
+                )
+                # Add assistant's answer
+                st.session_state.messages.append(
+                    {
+                        "role": "assistant",
+                        "content": query_data["content"],
+                        "sources": json.loads(
+                            query_data.get("answer_sources_used", [])
+                        ),
+                        "processing_time": query_data.get("processing_time"),
+                        "tokens_used": query_data.get("tokens_used", 0),
+                    }
+                )
+            st.session_state.messages_loaded = True
+        except Exception as e:
+            error_msg = f"Failed to load chat history: {str(e)}"
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
+            st.error(
+                f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
             )
-            # Add assistant's answer
-            st.session_state.messages.append(
-                {
-                    "role": "assistant",
-                    "content": query_data["content"],
-                    "sources": json.loads(query_data.get("answer_sources_used", [])),
-                    "processing_time": query_data.get("processing_time"),
-                    "tokens_used": query_data.get("tokens_used", 0),
-                }
-            )
-        st.session_state.messages_loaded = True
+            # Don't stop the app, just show empty messages
+            st.session_state.messages = []
+            st.session_state.messages_loaded = True
 
 
 def process_document_upload(uploaded_file):
@@ -141,62 +223,138 @@ def process_document_upload(uploaded_file):
     try:
         with st.spinner(f"Processing {uploaded_file.name}..."):
             # Process file
-            result = components["document_processor"].process_uploaded_file(
-                uploaded_file, settings.MAX_UPLOAD_SIZE
-            )
+            try:
+                result = components["document_processor"].process_uploaded_file(
+                    uploaded_file, settings.MAX_UPLOAD_SIZE
+                )
+            except Exception as e:
+                error_msg = f"Failed to process file {uploaded_file.name}: {str(e)}"
+                logger.error(error_msg)
+                logger.error(traceback.format_exc())
+                st.error(
+                    f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+                )
+                return False
 
             if not result["success"]:
                 st.error(result["error_message"])
                 return False
 
             # Store document in database
-            document_id = components["doc_ops"].insert_document(
-                document_name=result["filename"],
-                user_id=st.session_state.user_id,
-                document_text=result["text_content"],
-                file_size=result["file_size"],
-                file_type=result["file_type"],
-            )
+            try:
+                document_id = components["doc_ops"].insert_document(
+                    document_name=result["filename"],
+                    user_id=st.session_state.user_id,
+                    document_text=result["text_content"],
+                    file_size=result["file_size"],
+                    file_type=result["file_type"],
+                )
+            except Exception as e:
+                error_msg = f"Failed to insert document {uploaded_file.name} into database: {str(e)}"
+                logger.error(error_msg)
+                logger.error(traceback.format_exc())
+                st.error(
+                    f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+                )
+                return False
 
             # Create chunks
-            parent_chunks, child_chunks = components[
-                "document_chunker"
-            ].create_parent_child_chunks(result["text_content"], result["filename"])
+            try:
+                parent_chunks, child_chunks = components[
+                    "document_chunker"
+                ].create_parent_child_chunks(result["text_content"], result["filename"])
+            except Exception as e:
+                error_msg = (
+                    f"Failed to create chunks for {uploaded_file.name}: {str(e)}"
+                )
+                logger.error(error_msg)
+                logger.error(traceback.format_exc())
+                st.error(
+                    f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+                )
+                return False
 
             # Store parent chunks and generate embeddings
-            parent_chunk_ids = []
-            for parent_chunk in parent_chunks:
-                embedding = components["embedding_manager"].encode_single(
-                    parent_chunk["text"]
+            try:
+                parent_chunk_ids = []
+                for i, parent_chunk in enumerate(parent_chunks):
+                    try:
+                        embedding = components["embedding_manager"].encode_single(
+                            parent_chunk["text"]
+                        )
+                        parent_id = components["doc_ops"].insert_chunk(
+                            document_id=document_id,
+                            chunk_text=parent_chunk["text"],
+                            contextual_header=parent_chunk["contextual_header"],
+                            chunk_type="parent",
+                            embedding=embedding,
+                            chunk_index=parent_chunk["index"],
+                        )
+                        parent_chunk_ids.append(parent_id)
+                    except Exception as e:
+                        error_msg = f"Failed to process parent chunk {i} for {uploaded_file.name}: {str(e)}"
+                        logger.error(error_msg)
+                        logger.error(traceback.format_exc())
+                        st.error(
+                            f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+                        )
+                        return False
+            except Exception as e:
+                error_msg = f"Failed to process parent chunks for {uploaded_file.name}: {str(e)}"
+                logger.error(error_msg)
+                logger.error(traceback.format_exc())
+                st.error(
+                    f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
                 )
-                parent_id = components["doc_ops"].insert_chunk(
-                    document_id=document_id,
-                    chunk_text=parent_chunk["text"],
-                    contextual_header=parent_chunk["contextual_header"],
-                    chunk_type="parent",
-                    embedding=embedding,
-                    chunk_index=parent_chunk["index"],
-                )
-                parent_chunk_ids.append(parent_id)
+                return False
 
             # Store child chunks with parent relationships
-            for child_chunk in child_chunks:
-                parent_id = parent_chunk_ids[child_chunk["parent_index"]]
-                embedding = components["embedding_manager"].encode_single(
-                    child_chunk["text"]
+            try:
+                for i, child_chunk in enumerate(child_chunks):
+                    try:
+                        parent_id = parent_chunk_ids[child_chunk["parent_index"]]
+                        embedding = components["embedding_manager"].encode_single(
+                            child_chunk["text"]
+                        )
+                        components["doc_ops"].insert_chunk(
+                            document_id=document_id,
+                            chunk_text=child_chunk["text"],
+                            contextual_header=child_chunk["contextual_header"],
+                            chunk_type="child",
+                            embedding=embedding,
+                            chunk_index=child_chunk["index"],
+                            parent_chunk_id=parent_id,
+                        )
+                    except Exception as e:
+                        error_msg = f"Failed to process child chunk {i} for {uploaded_file.name}: {str(e)}"
+                        logger.error(error_msg)
+                        logger.error(traceback.format_exc())
+                        st.error(
+                            f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+                        )
+                        return False
+            except Exception as e:
+                error_msg = (
+                    f"Failed to process child chunks for {uploaded_file.name}: {str(e)}"
                 )
-                components["doc_ops"].insert_chunk(
-                    document_id=document_id,
-                    chunk_text=child_chunk["text"],
-                    contextual_header=child_chunk["contextual_header"],
-                    chunk_type="child",
-                    embedding=embedding,
-                    chunk_index=child_chunk["index"],
-                    parent_chunk_id=parent_id,
+                logger.error(error_msg)
+                logger.error(traceback.format_exc())
+                st.error(
+                    f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
                 )
+                return False
 
             # Mark document as processed
-            components["doc_ops"].mark_document_processed(document_id)
+            try:
+                components["doc_ops"].mark_document_processed(document_id)
+            except Exception as e:
+                error_msg = f"Failed to mark document {uploaded_file.name} as processed: {str(e)}"
+                logger.error(error_msg)
+                logger.error(traceback.format_exc())
+                st.error(
+                    f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+                )
+                return False
 
             st.success(f"✅ Successfully processed {uploaded_file.name}")
             st.info(
@@ -205,9 +363,10 @@ def process_document_upload(uploaded_file):
             return True
 
     except Exception as e:
-        logger.error(f"Error processing document {uploaded_file.name}: {e}")
+        error_msg = f"Error processing document {uploaded_file.name}: {str(e)}"
+        logger.error(error_msg)
         logger.error(traceback.format_exc())
-        st.error(f"Error processing document {uploaded_file.name}: {str(e)}")
+        st.error(f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```")
         return False
 
 
@@ -218,33 +377,51 @@ def display_sources(sources):
     if not sources:
         return
 
-    with st.expander(f"📚 Sources Used ({len(sources)} Chunks)", expanded=False):
-        for i, source in enumerate(sources, 1):
-            source_breadcrumb = source.get("source_breadcrumb", f"Source Chunk {i}")
-            header_content = source.get("contextual_header", "No Header Available")
-            text_content = source.get("chunk_text", "Content not available.")
+    try:
+        with st.expander(f"📚 Sources Used ({len(sources)} Chunks)", expanded=False):
+            for i, source in enumerate(sources, 1):
+                try:
+                    source_breadcrumb = source.get(
+                        "source_breadcrumb", f"Source Chunk {i}"
+                    )
+                    header_content = source.get(
+                        "contextual_header", "No Header Available"
+                    )
+                    text_content = source.get("chunk_text", "Content not available.")
 
-            st.write(f"<h6>📄 {source_breadcrumb}</h6>", unsafe_allow_html=True)
-            st.subheader("Breadcrumb: " + header_content)
-            st.write("##### **Chunk Text:**")
-            st.write(f"> {text_content}", unsafe_allow_html=True)
+                    st.write(f"<h6>📄 {source_breadcrumb}</h6>", unsafe_allow_html=True)
+                    st.subheader("Breadcrumb: " + header_content)
+                    st.write("##### **Chunk Text:**")
+                    st.write(f"> {text_content}", unsafe_allow_html=True)
 
-            relevance_score = source.get("relevance_score")
-            chunk_id = source.get("chunk_id")
+                    relevance_score = source.get("relevance_score")
+                    chunk_id = source.get("chunk_id")
 
-            if relevance_score is not None or chunk_id:
-                meta_cols = st.columns(2)
-                if relevance_score is not None:
-                    with meta_cols[0]:
-                        st.caption("Relevance Score:")
-                        st.write(float_to_percent(relevance_score))
-                if chunk_id:
-                    with meta_cols[1]:
-                        st.caption("Chunk ID:")
-                        st.write(f"`{chunk_id}`")
+                    if relevance_score is not None or chunk_id:
+                        meta_cols = st.columns(2)
+                        if relevance_score is not None:
+                            with meta_cols[0]:
+                                st.caption("Relevance Score:")
+                                st.write(float_to_percent(relevance_score))
+                        if chunk_id:
+                            with meta_cols[1]:
+                                st.caption("Chunk ID:")
+                                st.write(f"`{chunk_id}`")
 
-            if i < len(sources):
-                st.divider()
+                    if i < len(sources):
+                        st.divider()
+                except Exception as e:
+                    error_msg = f"Error displaying source {i}: {str(e)}"
+                    logger.error(error_msg)
+                    logger.error(traceback.format_exc())
+                    st.error(
+                        f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+                    )
+    except Exception as e:
+        error_msg = f"Error displaying sources: {str(e)}"
+        logger.error(error_msg)
+        logger.error(traceback.format_exc())
+        st.error(f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```")
 
 
 def get_file_type_emoji(file_type):
@@ -275,31 +452,52 @@ def get_file_type_emoji(file_type):
 
 def format_file_size(size_bytes):
     """Format file size in human readable format."""
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1024 * 1024:
-        return f"{size_bytes/1024:.1f} KB"
-    else:
-        return f"{size_bytes/(1024*1024):.1f} MB"
+    try:
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            return f"{size_bytes/1024:.1f} KB"
+        else:
+            return f"{size_bytes/(1024*1024):.1f} MB"
+    except Exception as e:
+        error_msg = f"Error formatting file size: {str(e)}"
+        logger.error(error_msg)
+        logger.error(traceback.format_exc())
+        return "Unknown size"
 
 
 def get_daily_token_usage():
     """Get today's token usage from session state."""
-    return components["query_ops"].get_todays_total_tokens()
+    try:
+        return components["query_ops"].get_todays_total_tokens()
+    except Exception as e:
+        error_msg = f"Error getting daily token usage: {str(e)}"
+        logger.error(error_msg)
+        logger.error(traceback.format_exc())
+        st.error(f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```")
+        return 0
 
 
 def recalculate_tokens():
-    daily_tokens = get_daily_token_usage()
-    token_limit = 500000
-    progress_percentage = min(daily_tokens / token_limit, 1.0)
+    try:
+        daily_tokens = get_daily_token_usage()
+        token_limit = 500000
+        progress_percentage = min(daily_tokens / token_limit, 1.0)
 
-    st.write("**Daily Token Usage**")
-    st.progress(progress_percentage)
-    st.caption(f"{daily_tokens:,} / 500k tokens used ({progress_percentage*100:.1f}%)")
-    if progress_percentage > 0.8:
-        st.warning("⚠️ Approaching daily limit!")
-    elif progress_percentage >= 1.0:
-        st.error("🚫 Daily limit reached!")
+        st.write("**Daily Token Usage**")
+        st.progress(progress_percentage)
+        st.caption(
+            f"{daily_tokens:,} / 500k tokens used ({progress_percentage*100:.1f}%)"
+        )
+        if progress_percentage > 0.8:
+            st.warning("⚠️ Approaching daily limit!")
+        elif progress_percentage >= 1.0:
+            st.error("🚫 Daily limit reached!")
+    except Exception as e:
+        error_msg = f"Error calculating token usage: {str(e)}"
+        logger.error(error_msg)
+        logger.error(traceback.format_exc())
+        st.error(f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```")
 
 
 def main():
@@ -365,70 +563,108 @@ def main():
         )
 
         if uploaded_files:
-            file_types = {}
-            total_size = 0
-            for file in uploaded_files:
-                file.seek(0, 2)
-                file_size = file.tell()
-                file.seek(0)
-                total_size += file_size
-                file_ext = os.path.splitext(file.name)[1].lower()
-                file_types[file_ext] = file_types.get(file_ext, 0) + 1
+            try:
+                file_types = {}
+                total_size = 0
+                for file in uploaded_files:
+                    try:
+                        file.seek(0, 2)
+                        file_size = file.tell()
+                        file.seek(0)
+                        total_size += file_size
+                        file_ext = os.path.splitext(file.name)[1].lower()
+                        file_types[file_ext] = file_types.get(file_ext, 0) + 1
+                    except Exception as e:
+                        error_msg = f"Error processing file {file.name}: {str(e)}"
+                        logger.error(error_msg)
+                        logger.error(traceback.format_exc())
+                        st.error(
+                            f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+                        )
+                        continue
 
-            st.info(
-                f"📊 **{len(uploaded_files)} files selected** ({format_file_size(total_size)})"
-            )
+                st.info(
+                    f"📊 **{len(uploaded_files)} files selected** ({format_file_size(total_size)})"
+                )
 
-            for file_type, count in file_types.items():
-                emoji = get_file_type_emoji(file_type)
-                st.caption(f"{emoji} {count}x {file_type.upper()[1:]} files")
+                for file_type, count in file_types.items():
+                    emoji = get_file_type_emoji(file_type)
+                    st.caption(f"{emoji} {count}x {file_type.upper()[1:]} files")
 
-            if st.button("Process All Files", type="primary"):
-                success_count = 0
-                failed_files = []
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                for i, uploaded_file in enumerate(uploaded_files):
-                    status_text.text(f"Processing {uploaded_file.name}...")
-                    progress_bar.progress((i + 1) / len(uploaded_files))
-                    if process_document_upload(uploaded_file):
-                        success_count += 1
-                    else:
-                        failed_files.append(uploaded_file.name)
-                progress_bar.empty()
-                status_text.empty()
-                if success_count > 0:
-                    st.success(
-                        f"✅ Successfully processed {success_count}/{len(uploaded_files)} files"
-                    )
-                if failed_files:
-                    st.error(f"❌ Failed to process {len(failed_files)} files:")
-                    for failed_file in failed_files:
-                        st.caption(f"• {failed_file}")
-                if success_count > 0:
-                    st.rerun()
+                if st.button("Process All Files", type="primary"):
+                    success_count = 0
+                    failed_files = []
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    for i, uploaded_file in enumerate(uploaded_files):
+                        status_text.text(f"Processing {uploaded_file.name}...")
+                        progress_bar.progress((i + 1) / len(uploaded_files))
+                        if process_document_upload(uploaded_file):
+                            success_count += 1
+                        else:
+                            failed_files.append(uploaded_file.name)
+                    progress_bar.empty()
+                    status_text.empty()
+                    if success_count > 0:
+                        st.success(
+                            f"✅ Successfully processed {success_count}/{len(uploaded_files)} files"
+                        )
+                    if failed_files:
+                        st.error(f"❌ Failed to process {len(failed_files)} files:")
+                        for failed_file in failed_files:
+                            st.caption(f"• {failed_file}")
+                    if success_count > 0:
+                        st.rerun()
+            except Exception as e:
+                error_msg = f"Error processing uploaded files: {str(e)}"
+                logger.error(error_msg)
+                logger.error(traceback.format_exc())
+                st.error(
+                    f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+                )
 
         st.divider()
 
         st.subheader("📄 Your Documents")
-        user_docs = components["doc_ops"].get_user_documents(st.session_state.user_id)
-        if user_docs:
-            st.metric("Total Documents", len(user_docs))
-            st.caption("**Recent uploads:**")
-            for doc in user_docs[:10]:
-                status = "✅" if doc["processed"] else "⏳"
-                file_ext = doc.get("file_type", "")
-                emoji = get_file_type_emoji(file_ext)
-                size_display = format_file_size(doc.get("file_size", 0))
-                st.caption(f"{status} {emoji} {doc['document_name']} ({size_display})")
-        else:
-            st.info("No documents uploaded yet")
-            st.caption("💡 Upload documents to get started!")
+        try:
+            user_docs = components["doc_ops"].get_user_documents(
+                st.session_state.user_id
+            )
+            if user_docs:
+                st.metric("Total Documents", len(user_docs))
+                st.caption("**Recent uploads:**")
+                for doc in user_docs[:10]:
+                    try:
+                        status = "✅" if doc["processed"] else "⏳"
+                        file_ext = doc.get("file_type", "")
+                        emoji = get_file_type_emoji(file_ext)
+                        size_display = format_file_size(doc.get("file_size", 0))
+                        st.caption(
+                            f"{status} {emoji} {doc['document_name']} ({size_display})"
+                        )
+                    except Exception as e:
+                        error_msg = f"Error displaying document {doc.get('document_name', 'Unknown')}: {str(e)}"
+                        logger.error(error_msg)
+                        logger.error(traceback.format_exc())
+                        st.caption(f"❌ Error displaying document: {str(e)}")
+            else:
+                st.info("No documents uploaded yet")
+                st.caption("💡 Upload documents to get started!")
+        except Exception as e:
+            error_msg = f"Error loading user documents: {str(e)}"
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
+            st.error(
+                f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+            )
 
         st.divider()
 
         st.subheader("📈 System Stats")
         try:
+            user_docs = components["doc_ops"].get_user_documents(
+                st.session_state.user_id
+            )
             total_docs = len(user_docs) if user_docs else 0
             processed_docs = (
                 len([doc for doc in user_docs if doc.get("processed", False)])
@@ -446,8 +682,12 @@ def main():
                 processing_rate = (processed_docs / total_docs) * 100
                 st.metric("Processing Rate", f"{processing_rate:.1f}%")
         except Exception as e:
-            logger.error(f"Error calculating system stats: {e}")
-            st.error("Error loading system statistics")
+            error_msg = f"Error calculating system stats: {str(e)}"
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
+            st.error(
+                f"Error loading system statistics\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+            )
 
     # ---- Main content area - Chat interface ----
 
@@ -455,22 +695,30 @@ def main():
     load_chat_history()
 
     # Display chat messages from history
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
-            if message["role"] == "assistant":
-                if "sources" in message and message["sources"]:
-                    display_sources(message["sources"])
-                if (
-                    "processing_time" in message
-                    and message["processing_time"] is not None
-                ):
-                    tokens_info = ""
-                    if "tokens_used" in message and message["tokens_used"]:
-                        tokens_info = f" | 🔢 Tokens used: {message['tokens_used']:,}"
-                    st.caption(
-                        f"⏱️ Processing time: {message['processing_time']:.2f} seconds{tokens_info}"
-                    )
+    try:
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.write(message["content"])
+                if message["role"] == "assistant":
+                    if "sources" in message and message["sources"]:
+                        display_sources(message["sources"])
+                    if (
+                        "processing_time" in message
+                        and message["processing_time"] is not None
+                    ):
+                        tokens_info = ""
+                        if "tokens_used" in message and message["tokens_used"]:
+                            tokens_info = (
+                                f" | 🔢 Tokens used: {message['tokens_used']:,}"
+                            )
+                        st.caption(
+                            f"⏱️ Processing time: {message['processing_time']:.2f} seconds{tokens_info}"
+                        )
+    except Exception as e:
+        error_msg = f"Error displaying chat messages: {str(e)}"
+        logger.error(error_msg)
+        logger.error(traceback.format_exc())
+        st.error(f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```")
 
     # Accept user input
     if query := st.chat_input("Ask anything about your uploaded documents..."):
@@ -478,6 +726,19 @@ def main():
         st.session_state.messages.append({"role": "user", "content": query})
         with st.chat_message("user"):
             st.write(query)
+
+        try:
+            user_docs = components["doc_ops"].get_user_documents(
+                st.session_state.user_id
+            )
+        except Exception as e:
+            error_msg = f"Error checking user documents: {str(e)}"
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
+            st.error(
+                f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+            )
+            user_docs = []
 
         if not user_docs:
             st.warning("⚠️ Please upload some documents first!")
@@ -492,30 +753,47 @@ def main():
 
                         source_info = []
                         if sources:
-                            for source in sources:
-                                source_info.append(
-                                    {
-                                        "chunk_id": source.get("chunk_id"),
-                                        "contextual_header": source.get(
-                                            "contextual_header"
-                                        )
-                                        or source.get("header"),
-                                        "relevance_score": source.get(
-                                            "relevance_score", 0.0
-                                        ),
-                                        "chunk_text": source.get("chunk_text"),
-                                    }
+                            try:
+                                for source in sources:
+                                    source_info.append(
+                                        {
+                                            "chunk_id": source.get("chunk_id"),
+                                            "contextual_header": source.get(
+                                                "contextual_header"
+                                            )
+                                            or source.get("header"),
+                                            "relevance_score": source.get(
+                                                "relevance_score", 0.0
+                                            ),
+                                            "chunk_text": source.get("chunk_text"),
+                                        }
+                                    )
+                            except Exception as e:
+                                error_msg = f"Error processing sources: {str(e)}"
+                                logger.error(error_msg)
+                                logger.error(traceback.format_exc())
+                                st.error(
+                                    f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
                                 )
+                                source_info = []
 
-                        components["query_ops"].insert_query(
-                            user_query=query,
-                            answer_text=answer,
-                            answer_sources=source_info,
-                            user_id=st.session_state.user_id,
-                            processing_time=processing_time,
-                            chunks_used=len(sources) if sources else 0,
-                            tokens_used=total_tokens,
-                        )
+                        try:
+                            components["query_ops"].insert_query(
+                                user_query=query,
+                                answer_text=answer,
+                                answer_sources=source_info,
+                                user_id=st.session_state.user_id,
+                                processing_time=processing_time,
+                                chunks_used=len(sources) if sources else 0,
+                                tokens_used=total_tokens,
+                            )
+                        except Exception as e:
+                            error_msg = f"Error saving query to database: {str(e)}"
+                            logger.error(error_msg)
+                            logger.error(traceback.format_exc())
+                            st.warning(
+                                f"Answer generated but failed to save to database: {str(e)}"
+                            )
 
                         # Display and store assistant response
                         st.write(answer)
@@ -539,13 +817,22 @@ def main():
 
                     except Exception as e:
                         error_message = f"❌ An error occurred while processing your query: {str(e)}"
-                        logger.error(f"Error during retrieval: {e}")
+                        logger.error(f"Error during retrieval: {str(e)}")
                         logger.error(traceback.format_exc())
-                        st.error(error_message)
+                        st.error(
+                            f"{error_message}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+                        )
                         st.session_state.messages.append(
                             {"role": "assistant", "content": error_message}
                         )
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        error_msg = f"Fatal error in main application: {str(e)}"
+        logger.error(error_msg)
+        logger.error(traceback.format_exc())
+        st.error(f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```")
+        st.stop()
