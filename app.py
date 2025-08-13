@@ -78,7 +78,11 @@ def initialize_system():
 
         # Initialize components
         try:
-            db_manager = DatabaseManager(settings.DATABASE_PATH)
+            if settings.TEST == "True":
+                db_manager = DatabaseManager(settings.DATABASE_PATH)
+            else:
+                db_manager = DatabaseManager()
+
             doc_ops = DocumentOperations(db_manager)
             query_ops = QueryOperations(db_manager)
         except Exception as e:
