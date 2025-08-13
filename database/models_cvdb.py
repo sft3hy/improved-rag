@@ -5,7 +5,7 @@ import json
 
 
 class DatabaseManager:
-    def __init__(self, host: str = "localhost", port: int = 5432):
+    def __init__(self, host: str = "10.42.95.129", port: int = 5432):
         self.connection_params = {
             "host": host,
             "port": port,
