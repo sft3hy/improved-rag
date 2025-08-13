@@ -4,7 +4,7 @@ FROM python:3.13.5-alpine
 RUN apk update && \
     apk add --no-cache wget && \
     apk add --no-cache build-base libffi-dev openssl-dev && \
-    apk add python3 py3-pip gcc musl-dev && 
+    apk add python3 py3-pip gcc musl-dev
 
 
 # Install Python packages from requirements.txt (if needed)
