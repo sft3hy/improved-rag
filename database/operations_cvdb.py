@@ -216,11 +216,13 @@ class QueryOperations:
                 for row in cursor.fetchall():
                     row_dict = dict(row)
                     # Parse sources JSON
-                    sources = (
-                        json.loads(row_dict["answer_sources_used"])
-                        if row_dict["answer_sources_used"]
-                        else []
-                    )
+                    if row_dict["answer_sources_used"]:
+                        try:
+                            sources = json.loads(row_dict["answer_sources_used"])
+                        except (json.JSONDecodeError, TypeError):
+                            sources = []
+                    else:
+                        sources = []
                     row_dict["answer_sources"] = sources
                     queries.append(row_dict)
 
@@ -246,9 +248,12 @@ class QueryOperations:
                     query_dict = dict(row)
                     # Parse sources JSON
                     if query_dict.get("answer_sources_used"):
-                        query_dict["answer_sources"] = json.loads(
-                            query_dict["answer_sources_used"]
-                        )
+                        try:
+                            query_dict["answer_sources"] = json.loads(
+                                query_dict["answer_sources_used"]
+                            )
+                        except (json.JSONDecodeError, TypeError):
+                            query_dict["answer_sources"] = []
                     else:
                         query_dict["answer_sources"] = []
 

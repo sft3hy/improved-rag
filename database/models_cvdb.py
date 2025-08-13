@@ -5,7 +5,7 @@ import json
 
 
 class DatabaseManager:
-    def __init__(self, host: str = "10.42.95.129", port: int = 5432):
+    def __init__(self, host: str = "localhost", port: int = 5432):
         self.connection_params = {
             "host": host,
             "port": port,
@@ -124,7 +124,7 @@ class DatabaseManager:
                         SELECT COALESCE(SUM(tokens_used), 0)
                         FROM user_queries 
                         WHERE user_id = %s 
-                        AND DATE(timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'localtime') = CURRENT_DATE
+                        AND DATE(timestamp) = CURRENT_DATE
                         """,
                         (user_id,),
                     )
@@ -133,7 +133,7 @@ class DatabaseManager:
                         """
                         SELECT COALESCE(SUM(tokens_used), 0)
                         FROM user_queries 
-                        WHERE DATE(timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'localtime') = CURRENT_DATE
+                        WHERE DATE(timestamp) = CURRENT_DATE
                         """
                     )
 
