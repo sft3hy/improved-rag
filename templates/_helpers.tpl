@@ -1,14 +1,51 @@
 {{/*
-Return the fully qualified name of the chart.
-This automatically adapts to whatever .Chart.Name is at render time.
+Create a default fully qualified app name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+If release name contains chart name it will be used as a full name.
 */}}
-{{- define (print .Chart.Name ".fullname") -}}
-{{- printf "%s-%s" .Release.Name .Chart.Name | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
+{{- define "improved-rag-frontend.fullname" -}}
+{{- if .Values.fullnameOverride }}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- $name := default .Chart.Name .Values.nameOverride }}
+{{- if contains $name .Release.Name }}
+{{- .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+{{- end }}
+{{- end }}
+{{- end }}
 
 {{/*
-Return the short name of the chart.
+Create chart name and version as used by the chart label.
 */}}
-{{- define (print .Chart.Name ".name") -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
+{{- define "improved-rag-frontend.chart" -}}
+{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Create the name of the app to use
+*/}}
+{{- define "improved-rag-frontend.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Common labels
+*/}}
+{{- define "improved-rag-frontend.labels" -}}
+helm.sh/chart: {{ include "improved-rag-frontend.chart" . }}
+{{ include "improved-rag-frontend.selectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{/*
+Selector labels
+*/}}
+{{- define "improved-rag-frontend.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "improved-rag-frontend.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

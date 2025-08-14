@@ -17,3 +17,13 @@ service:
 replicaCount: 1
 
 resources: {}
+
+# Name settings - these will be used in templates
+nameOverride: ""
+fullnameOverride: ""
+
+# Template names (makes helpers more flexible)
+templateNames:
+  fullname: "improved-rag-frontend.fullname"
+  name: "improved-rag-frontend.name"
+  labels: "improved-rag-frontend.labels"
