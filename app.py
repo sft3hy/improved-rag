@@ -198,13 +198,16 @@ def load_chat_history():
                     {"role": "user", "content": query_data["user_query"]}
                 )
                 # Add assistant's answer
+                raw_sources = query_data.get("answer_sources_used", [])
+                if type(raw_sources) is list:
+                    sources = raw_sources
+                else:
+                    sources = json.loads(raw_sources)
                 st.session_state.messages.append(
                     {
                         "role": "assistant",
                         "content": query_data["content"],
-                        "sources": json.loads(
-                            query_data.get("answer_sources_used", [])
-                        ),
+                        "sources": sources,
                         "processing_time": query_data.get("processing_time"),
                         "tokens_used": query_data.get("tokens_used", 0),
                     }
