@@ -1,0 +1,19 @@
+# Image settings
+image:
+  repository: harbor.i2cv.io/cosmichorizon/improved-rag-frontend
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# If your Harbor registry requires auth, you need to create a Kubernetes secret and reference it here
+imagePullSecrets:
+  - name: s-hx12n
+
+# Service settings
+service:
+  type: ClusterIP
+  port: 80
+
+# App settings
+replicaCount: 1
+
+resources: {}
