@@ -1,4 +1,0 @@
-.git/
-*.db
-files/*.db
-charts/*.tgz

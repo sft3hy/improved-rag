@@ -1,6 +1,0 @@
-apiVersion: v2
-name: improved-rag-frontend
-description: helm chart for streamlit frontend rag app
-type: application
-version: 0.1.0
-appVersion: "1.0.0"
