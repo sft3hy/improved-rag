@@ -5,7 +5,11 @@ import os
 
 
 class DatabaseManager:
-    def __init__(self, host: str = os.getenv("PGSQL_HOST_IP"), port: int = 5432):
+    def __init__(
+        self,
+        host: str = os.getenv("PGSQL_HOST_IP"),
+        port: int = os.getenv("PGSQL_HOST_PORT"),
+    ):
         self.connection_params = {
             "host": host,
             "port": port,
