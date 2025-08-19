@@ -135,7 +135,7 @@ Answer:"""
 
             answer = self._extract_content(response).strip()
             token_usage = self.get_token_usage(response)
-            logger.info("Generated answer successfully")
+            logger.info(f"Generated answer successfully")
             return answer, token_usage
 
         except Exception as e:
@@ -159,6 +159,7 @@ class GroqLLMClient(BaseLLMClient):
         self, messages: List[Dict], max_tokens: int = 2000, temperature: float = 0.3
     ) -> Any:
         """Make a chat completion request using Groq."""
+        logger.info(f"Using {self.model_name}")
         return self.client.chat.completions.create(
             messages=messages,
             model=self.model_name,
@@ -206,7 +207,7 @@ class SanctuaryLLMClient(BaseLLMClient):
             "max_tokens": max_tokens,
             "temperature": temperature,
         }
-
+        logger.info(f"Using {self.model_name}")
         response = self.session.post(
             f"{self.base_url}/v1/chat/completions", json=payload
         )
