@@ -10,15 +10,23 @@ from datetime import datetime, date
 # Import project modules
 from config.settings import settings
 
+client = ""
+
 if settings.TEST == "True":
     from database.models import DatabaseManager
     from database.operations import DocumentOperations, QueryOperations
+    from rag.llm_client import GroqLLMClient
+
+    client = GroqLLMClient()
+
 else:
     from database.models_cvdb import DatabaseManager
     from database.operations_cvdb import DocumentOperations, QueryOperations
+    from rag.llm_client import SanctuaryLLMClient
+
+    client = SanctuaryLLMClient()
 from rag.embeddings import EmbeddingManager
 from rag.chunking import DocumentChunker
-from rag.llm_client import GroqLLMClient
 from rag.retrieval import EnhancedRAGRetriever
 from utils.document_processor import EnhancedDocumentProcessor
 from utils.streamlit_utils import float_to_percent
@@ -122,7 +130,7 @@ def initialize_system():
             st.stop()
 
         try:
-            llm_client = GroqLLMClient(settings.GROQ_API_KEY, settings.LLM_MODEL)
+            llm_client = client
         except Exception as e:
             error_msg = f"Failed to initialize LLM client: {str(e)}"
             logger.error(error_msg)
