@@ -396,47 +396,41 @@ def display_sources(sources):
         with st.expander(f"📚 Sources Used ({len(sources)} Chunks)", expanded=False):
             for i, source in enumerate(sources, 1):
                 try:
-                    source_breadcrumb = source.get(
-                        "source_breadcrumb", f"Source Chunk {i}"
-                    )
-                    header_content = source.get(
-                        "contextual_header", "No Header Available"
-                    )
-                    text_content = source.get("chunk_text", "Content not available.")
+                    with st.expander(f"Chunk {i}"):
+                        breadcrumb = source.get(
+                            "source_breadcrumb", f"Source Chunk {i}"
+                        )
+                        header = source.get("contextual_header", "No Header Available")
+                        text = source.get("chunk_text", "Content not available.")
 
-                    st.write(f"<h6>📄 {source_breadcrumb}</h6>", unsafe_allow_html=True)
-                    st.subheader("Breadcrumb: " + header_content)
-                    st.write("##### **Chunk Text:**")
-                    st.write(f"> {text_content}", unsafe_allow_html=True)
+                        st.write(f"📄 {header}")
 
-                    relevance_score = source.get("relevance_score")
-                    chunk_id = source.get("chunk_id")
+                        # Truncate text inline
+                        display_text = text[:300] + "..." if len(text) > 300 else text
+                        st.markdown(f"> {display_text}")
 
-                    if relevance_score is not None or chunk_id:
-                        meta_cols = st.columns(2)
-                        if relevance_score is not None:
-                            with meta_cols[0]:
-                                st.caption("Relevance Score:")
-                                st.write(float_to_percent(relevance_score))
-                        if chunk_id:
-                            with meta_cols[1]:
-                                st.caption("Chunk ID:")
-                                st.write(f"`{chunk_id}`")
+                        # Inline metadata display
+                        meta_parts = []
+                        if score := source.get("relevance_score"):
+                            meta_parts.append(
+                                f"Similarity score: {float_to_percent(score)}"
+                            )
+                        if chunk_id := source.get("chunk_id"):
+                            meta_parts.append(f"Chunk ID: `{chunk_id}`")
 
-                    if i < len(sources):
-                        st.divider()
+                        if meta_parts:
+                            st.caption(" | ".join(meta_parts))
+
+                        if i < len(sources):
+                            st.divider()
+
                 except Exception as e:
-                    error_msg = f"Error displaying source {i}: {str(e)}"
-                    logger.error(error_msg)
-                    logger.error(traceback.format_exc())
-                    st.error(
-                        f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
-                    )
+                    st.error(f"Error displaying source {i}: {str(e)}")
+                    logger.error(f"Source display error: {e}", exc_info=True)
+
     except Exception as e:
-        error_msg = f"Error displaying sources: {str(e)}"
-        logger.error(error_msg)
-        logger.error(traceback.format_exc())
-        st.error(f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```")
+        st.error(f"Error displaying sources: {str(e)}")
+        logger.error(f"Sources display error: {e}", exc_info=True)
 
 
 def get_file_type_emoji(file_type):
@@ -495,19 +489,19 @@ def get_daily_token_usage():
 
 def recalculate_tokens():
     try:
-        daily_tokens = get_daily_token_usage()
-        token_limit = 500000
-        progress_percentage = min(daily_tokens / token_limit, 1.0)
-
-        st.write("**Daily Token Usage**")
-        st.progress(progress_percentage)
-        st.caption(
-            f"{daily_tokens:,} / 500k tokens used ({progress_percentage*100:.1f}%)"
-        )
-        if progress_percentage > 0.8:
-            st.warning("⚠️ Approaching daily limit!")
-        elif progress_percentage >= 1.0:
-            st.error("🚫 Daily limit reached!")
+        with st.sidebar:
+            daily_tokens = get_daily_token_usage()
+            token_limit = 500000
+            progress_percentage = min(daily_tokens / token_limit, 1.0)
+            st.write("**Daily Token Usage**")
+            st.progress(progress_percentage)
+            st.caption(
+                f"{daily_tokens:,} / 500k tokens used ({progress_percentage*100:.1f}%)"
+            )
+            if progress_percentage > 0.8:
+                st.warning("⚠️ Approaching daily limit!")
+            elif progress_percentage >= 1.0:
+                st.error("🚫 Daily limit reached!")
     except Exception as e:
         error_msg = f"Error calculating token usage: {str(e)}"
         logger.error(error_msg)
@@ -525,7 +519,8 @@ def main():
         st.write(
             "*Advanced Retrieval-Augmented Generation with Multi-Query and Parent-Child Chunking*"
         )
-        recalculate_tokens()
+
+    recalculate_tokens()
 
     # Sidebar for document management
     with st.sidebar:
@@ -675,34 +670,31 @@ def main():
 
         st.divider()
 
-        st.subheader("📈 System Stats")
-        try:
-            user_docs = components["doc_ops"].get_user_documents(
-                st.session_state.user_id
-            )
-            total_docs = len(user_docs) if user_docs else 0
-            processed_docs = (
-                len([doc for doc in user_docs if doc.get("processed", False)])
-                if user_docs
-                else 0
-            )
-            # Get total query count from all users
-            total_queries = len(
-                components["query_ops"].get_all_queries()
-            )  # Assumes you add a get_query_count method
-            st.metric("Total Documents", total_docs)
-            st.metric("Processed Documents", processed_docs)
-            st.metric("Total Queries (All Users)", total_queries)
-            if total_docs > 0:
-                processing_rate = (processed_docs / total_docs) * 100
-                st.metric("Processing Rate", f"{processing_rate:.1f}%")
-        except Exception as e:
-            error_msg = f"Error calculating system stats: {str(e)}"
-            logger.error(error_msg)
-            logger.error(traceback.format_exc())
-            st.error(
-                f"Error loading system statistics\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
-            )
+        with st.expander("📈 System Stats:"):
+            try:
+                user_docs = components["doc_ops"].get_user_documents(
+                    st.session_state.user_id
+                )
+                total_docs = len(user_docs) if user_docs else 0
+                processed_docs = (
+                    len([doc for doc in user_docs if doc.get("processed", False)])
+                    if user_docs
+                    else 0
+                )
+                # Get total query count from all users
+                total_queries = len(
+                    components["query_ops"].get_all_queries()
+                )  # Assumes you add a get_query_count method
+                st.metric("Total Documents", total_docs)
+                st.metric("Processed Documents", processed_docs)
+                st.metric("Total Queries (All Users)", total_queries)
+            except Exception as e:
+                error_msg = f"Error calculating system stats: {str(e)}"
+                logger.error(error_msg)
+                logger.error(traceback.format_exc())
+                st.error(
+                    f"Error loading system statistics\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
+                )
 
     # ---- Main content area - Chat interface ----
 
@@ -727,7 +719,7 @@ def main():
                                 f" | 🔢 Tokens used: {message['tokens_used']:,}"
                             )
                         st.caption(
-                            f"⏱️ Processing time: {message['processing_time']:.2f} seconds{tokens_info}"
+                            f"⏱️ Response time: {message['processing_time']:.2f} seconds {tokens_info} | 📚 Sources: {len(message["sources"]) if message["sources"] else 0}"
                         )
     except Exception as e:
         error_msg = f"Error displaying chat messages: {str(e)}"
@@ -759,87 +751,155 @@ def main():
             st.warning("⚠️ Please upload some documents first!")
         else:
             with st.chat_message("assistant"):
-                with st.spinner("🤖 Searching and generating answer..."):
-                    try:
-                        start_time = time.time()
-                        answer, sources, processing_time, total_tokens = components[
-                            "retriever"
-                        ].retrieve_and_generate(query, st.session_state.user_id)
+                # Create a placeholder for dynamic status updates
+                status_placeholder = st.empty()
+                progress_placeholder = st.empty()
 
-                        source_info = []
-                        if sources:
-                            try:
-                                for source in sources:
-                                    source_info.append(
-                                        {
-                                            "chunk_id": source.get("chunk_id"),
-                                            "contextual_header": source.get(
-                                                "contextual_header"
-                                            )
-                                            or source.get("header"),
-                                            "relevance_score": source.get(
-                                                "relevance_score", 0.0
-                                            ),
-                                            "chunk_text": source.get("chunk_text"),
-                                        }
-                                    )
-                            except Exception as e:
-                                error_msg = f"Error processing sources: {str(e)}"
-                                logger.error(error_msg)
-                                logger.error(traceback.format_exc())
-                                st.error(
-                                    f"{error_msg}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
-                                )
-                                source_info = []
+                try:
+                    start_time = time.time()
 
+                    # Phase 1: Initial retrieval
+                    with status_placeholder.container():
+                        st.info(
+                            "🔍 **Phase 1/2:** Searching knowledge base for relevant information..."
+                        )
+
+                    # Simulate progress for retrieval phase (adjust timing based on your actual process)
+                    progress_bar = progress_placeholder.progress(
+                        0, text="Initializing search..."
+                    )
+                    progress_bar.progress(
+                        25, text="Analyzing query and extracting keywords..."
+                    )
+                    progress_bar.progress(
+                        50,
+                        text="Searching through document chunks and generating response...",
+                    )
+
+                    # Actual retrieval call
+                    answer, sources, processing_time, total_tokens = components[
+                        "retriever"
+                    ].retrieve_and_generate(query, st.session_state.user_id)
+
+                    progress_bar.progress(
+                        100, text="✅ Search and generation complete!"
+                    )
+
+                    # Phase 2: Processing sources
+                    with status_placeholder.container():
+                        st.info(
+                            "📋 **Phase 2/2:** Processing and validating source information..."
+                        )
+
+                    progress_bar.progress(0, text="Extracting source metadata...")
+
+                    source_info = []
+                    if sources:
                         try:
-                            components["query_ops"].insert_query(
-                                user_query=query,
-                                answer_text=answer,
-                                answer_sources=source_info,
-                                user_id=st.session_state.user_id,
-                                processing_time=processing_time,
-                                chunks_used=len(sources) if sources else 0,
-                                tokens_used=total_tokens,
+                            total_sources = len(sources)
+                            for i, source in enumerate(sources):
+                                progress_percentage = int((i + 1) / total_sources * 100)
+                                progress_bar.progress(
+                                    progress_percentage,
+                                    text=f"Processing source {i + 1} of {total_sources}...",
+                                )
+
+                                source_info.append(
+                                    {
+                                        "chunk_id": source.get("chunk_id"),
+                                        "contextual_header": source.get(
+                                            "contextual_header"
+                                        )
+                                        or source.get("header"),
+                                        "relevance_score": source.get(
+                                            "relevance_score", 0.0
+                                        ),
+                                        "chunk_text": source.get("chunk_text"),
+                                    }
+                                )
+
+                            progress_bar.progress(
+                                100,
+                                text=f"✅ Processed {total_sources} sources successfully!",
                             )
+
                         except Exception as e:
-                            error_msg = f"Error saving query to database: {str(e)}"
+                            error_msg = f"Error processing sources: {str(e)}"
                             logger.error(error_msg)
                             logger.error(traceback.format_exc())
-                            st.warning(
-                                f"Answer generated but failed to save to database: {str(e)}"
+
+                            with status_placeholder.container():
+                                st.error(f"❌ **Error in Phase 2:** {error_msg}")
+                                with st.expander("📋 View Error Details"):
+                                    st.code(traceback.format_exc(), language="python")
+
+                            source_info = []
+                            progress_bar.progress(
+                                100, text="⚠️ Source processing completed with errors"
                             )
-
-                        # Display and store assistant response
-                        st.write(answer)
-                        if sources:
-                            display_sources(sources)
-                        st.caption(
-                            f"⏱️ Processing time: {processing_time:.2f} seconds | 🔢 Tokens used: {total_tokens:,}"
+                    else:
+                        progress_bar.progress(
+                            100, text="ℹ️ No sources found for this query"
                         )
 
-                        st.session_state.messages.append(
-                            {
-                                "role": "assistant",
-                                "content": answer,
-                                "sources": sources,
-                                "processing_time": processing_time,
-                                "tokens_used": total_tokens,
-                            }
+                    # Clear status indicators
+                    status_placeholder.empty()
+                    progress_placeholder.empty()
+
+                    # Display and store assistant response
+                    st.write(answer)
+                    if sources:
+                        display_sources(sources)
+                    total_elapsed = time.time() - start_time
+
+                    st.caption(
+                        f"⏱️ Response time: {total_elapsed:.2f} seconds | 🔢 Tokens used: {total_tokens:,} | 📚 Sources: {len(sources) if sources else 0}"
+                    )
+
+                    st.session_state.messages.append(
+                        {
+                            "role": "assistant",
+                            "content": answer,
+                            "sources": sources,
+                            "processing_time": processing_time,
+                            "tokens_used": total_tokens,
+                        }
+                    )
+
+                    try:
+                        components["query_ops"].insert_query(
+                            user_query=query,
+                            answer_text=answer,
+                            answer_sources=source_info,
+                            user_id=st.session_state.user_id,
+                            processing_time=total_elapsed,
+                            chunks_used=len(sources) if sources else 0,
+                            tokens_used=total_tokens,
                         )
-                        recalculate_tokens()
-                        st.rerun()
 
                     except Exception as e:
-                        error_message = f"❌ An error occurred while processing your query: {str(e)}"
-                        logger.error(f"Error during retrieval: {str(e)}")
+                        error_msg = f"Error saving query to database: {str(e)}"
+                        logger.error(error_msg)
                         logger.error(traceback.format_exc())
-                        st.error(
-                            f"{error_message}\n\n**Traceback:**\n```\n{traceback.format_exc()}\n```"
-                        )
-                        st.session_state.messages.append(
-                            {"role": "assistant", "content": error_message}
-                        )
+
+                        with status_placeholder.container():
+                            st.warning(f"⚠️ Answer generated but database save failed")
+                            with st.expander("📋 View Database Error Details"):
+                                st.code(
+                                    f"{error_msg}\n\n{traceback.format_exc()}",
+                                    language="python",
+                                )
+                    recalculate_tokens()
+                    st.rerun()
+
+                except Exception as e:
+                    # Handle any unexpected errors
+                    status_placeholder.empty()
+                    progress_placeholder.empty()
+
+                    st.error(f"❌ **Unexpected Error:** {str(e)}")
+                    with st.expander("📋 View Full Error Details"):
+                        st.code(traceback.format_exc(), language="python")
 
 
 if __name__ == "__main__":
