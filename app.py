@@ -11,6 +11,8 @@ from datetime import datetime, date
 from config.settings import settings
 
 client = ""
+powered = ""
+model = ""
 
 if settings.TEST == "True":
     from database.models import DatabaseManager
@@ -18,6 +20,8 @@ if settings.TEST == "True":
     from rag.llm_client import GroqLLMClient
 
     client = GroqLLMClient()
+    powered = "Powered by Groq and Llama 4 Scout"
+    model = "Llama 4 Scout"
 
 else:
     from database.models_cvdb import DatabaseManager
@@ -25,6 +29,9 @@ else:
     from rag.llm_client import SanctuaryLLMClient
 
     client = SanctuaryLLMClient()
+    powered = "Powered by Sanctuary and Claude 3.5 Sonnet"
+    model = "Claude 3.5 Sonnet"
+
 from rag.embeddings import EmbeddingManager
 from rag.chunking import DocumentChunker
 from rag.retrieval import EnhancedRAGRetriever
@@ -519,6 +526,7 @@ def main():
         st.write(
             "*Advanced Retrieval-Augmented Generation with Multi-Query and Parent-Child Chunking*"
         )
+        st.write(powered)
 
     recalculate_tokens()
 
@@ -719,7 +727,7 @@ def main():
                                 f" | 🔢 Tokens used: {message['tokens_used']:,}"
                             )
                         st.caption(
-                            f"⏱️ Response time: {message['processing_time']:.2f} seconds {tokens_info} | 📚 Sources: {len(message["sources"]) if message["sources"] else 0}"
+                            f"🧠 Model: {model} | ⏱️ Response time: {message['processing_time']:.2f} seconds {tokens_info} | 📚 Sources: {len(message["sources"]) if message["sources"] else 0}"
                         )
     except Exception as e:
         error_msg = f"Error displaying chat messages: {str(e)}"
@@ -853,7 +861,7 @@ def main():
                     total_elapsed = time.time() - start_time
 
                     st.caption(
-                        f"⏱️ Response time: {total_elapsed:.2f} seconds | 🔢 Tokens used: {total_tokens:,} | 📚 Sources: {len(sources) if sources else 0}"
+                        f"🧠 Model: {model} | ⏱️ Response time: {total_elapsed:.2f} seconds | 🔢 Tokens used: {total_tokens:,} | 📚 Sources: {len(sources) if sources else 0}"
                     )
 
                     st.session_state.messages.append(
