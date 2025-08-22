@@ -36,4 +36,4 @@ COPY . .
 EXPOSE 8501
 
 # Default command
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0" "--server.baseUrl /cosmicrag"]
+CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0", "--server.baseUrl /cosmicrag"]
