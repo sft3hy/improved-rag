@@ -23,60 +23,14 @@ import pandas as pd
 import email
 from email import policy
 from bs4 import BeautifulSoup
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
 
 class EnhancedDocumentProcessor:
     def __init__(self):
-        self.supported_extensions = {
-            # Text files
-            ".txt",
-            ".md",
-            ".rst",
-            ".log",
-            ".cfg",
-            ".ini",
-            ".conf",
-            # Code files
-            ".py",
-            ".js",
-            ".html",
-            ".css",
-            ".json",
-            ".xml",
-            ".yaml",
-            ".yml",
-            ".java",
-            ".cpp",
-            ".c",
-            ".h",
-            ".php",
-            ".rb",
-            ".go",
-            ".rs",
-            ".sql",
-            # Office documents
-            ".pdf",
-            ".docx",
-            ".doc",
-            ".pptx",
-            ".ppt",
-            # Spreadsheets
-            ".xlsx",
-            ".xls",
-            ".csv",
-            ".tsv",
-            # Email and web
-            ".eml",
-            ".htm",
-            ".xhtml",
-            # Other structured formats
-            ".rtf",
-            ".odt",
-            ".ods",
-            ".odp",
-        }
+        self.supported_extensions = settings.SUPPORTED_EXTENSIONS
 
     def is_supported_file(self, filename: str) -> bool:
         """Check if file type is supported."""

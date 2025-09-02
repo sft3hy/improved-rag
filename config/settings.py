@@ -29,10 +29,59 @@ class Settings:
     DATABASE_PATH = "data/rag_database.db"
 
     # UI Configuration
-    MAX_UPLOAD_SIZE = 20  # MB
+    MAX_UPLOAD_SIZE = 200  # MB
 
     # Locally or deployed
     TEST = os.getenv("TEST_LOCAL")
+
+    SUPPORTED_EXTENSIONS = {
+        # Text files
+        ".txt",
+        ".md",
+        ".rst",
+        ".log",
+        ".cfg",
+        ".ini",
+        ".conf",
+        # Code files
+        ".py",
+        ".js",
+        ".html",
+        ".css",
+        ".json",
+        ".xml",
+        ".yaml",
+        ".yml",
+        ".java",
+        ".cpp",
+        ".c",
+        ".h",
+        ".php",
+        ".rb",
+        ".go",
+        ".rs",
+        ".sql",
+        # Office documents
+        ".pdf",
+        ".docx",
+        ".doc",
+        ".pptx",
+        ".ppt",
+        # Spreadsheets
+        ".xlsx",
+        ".xls",
+        ".csv",
+        ".tsv",
+        # Email and web
+        ".eml",
+        ".htm",
+        ".xhtml",
+        # Other structured formats
+        ".rtf",
+        ".odt",
+        ".ods",
+        ".odp",
+    }
 
 
 settings = Settings()

@@ -10,6 +10,7 @@ from utils.streamlit_utils import (
 )  # Assuming this exists as in the original code
 
 logger = logging.getLogger(__name__)
+from config.settings import settings
 
 
 def get_file_type_emoji(file_type):
@@ -101,7 +102,7 @@ def display_sidebar(components, settings):
         st.header("📁 Document Management")
         uploaded_files = st.file_uploader(
             "Upload Documents",
-            type=["pdf", "docx", "txt", "md"],
+            type=settings.SUPPORTED_EXTENSIONS,
             accept_multiple_files=True,
             help=f"Max file size: {settings.MAX_UPLOAD_SIZE}MB",
         )
