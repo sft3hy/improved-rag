@@ -36,4 +36,4 @@ COPY . .
 EXPOSE 8501
 
 # Default command
-CMD ["streamlit", "run", "app.py"]
+CMD ["streamlit", "run", "app.py", "--server.baseUrlPath=cosmicrag"]
