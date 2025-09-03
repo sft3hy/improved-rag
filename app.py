@@ -4,11 +4,12 @@ import streamlit as st
 import logging
 import traceback
 from datetime import datetime
+import time
 
 # Import project modules
 from config.settings import settings
 from utils.system_init import initialize_system
-from utils.ui import display_sidebar, display_chat_messages
+from utils.ui import display_sidebar, display_chat_messages, display_user_info_sidebar
 from utils.chat_handler import load_chat_history, handle_user_query
 from utils.jira_connector import format_issue_for_rag
 from utils.authentication import authenticate
@@ -94,51 +95,6 @@ def init_session_state():
         st.session_state.jira_selected_issues = {}
     if "pending_jira_analysis" not in st.session_state:
         st.session_state.pending_jira_analysis = None
-
-
-def display_user_info_sidebar():
-    """Display user information in sidebar."""
-    if hasattr(st.session_state, "user_info") and st.session_state.user_info:
-        with st.sidebar:
-            st.subheader("👤 User Profile")
-
-            user_info = st.session_state.user_info
-
-            # Display user basic info
-            st.write(f"**Email:** {user_info.get('email', 'Unknown')}")
-            if user_info.get("display_name"):
-                st.write(f"**Name:** {user_info['display_name']}")
-
-            # Display user stats
-            activity_stats = st.session_state.components[
-                "user_ops"
-            ].get_user_activity_stats(st.session_state.user_id)
-
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Documents", activity_stats["document_count"])
-                st.metric("Total Queries", activity_stats["total_queries"])
-            with col2:
-                st.metric("Today's Tokens", activity_stats["today_tokens"])
-                st.metric("Total Tokens", activity_stats["total_tokens"])
-
-            # Show recent activity
-            if activity_stats["recent_activity"]:
-                st.write("**Recent Activity (7 days):**")
-                for date, count in activity_stats["recent_activity"][
-                    :3
-                ]:  # Show last 3 days
-                    st.write(f"• {date}: {count} queries")
-
-            first_login = user_info.get("first_login", "Unknown")
-            if isinstance(first_login, datetime):
-                first_login_str = first_login.strftime("%Y-%m-%d")
-            elif first_login != "Unknown":
-                first_login_str = str(first_login)[:10]
-            else:
-                first_login_str = "Unknown"
-
-            st.write(f"**Member since:** {first_login_str}")
 
 
 def handle_enhanced_user_query(query, components, model_name):
@@ -337,7 +293,7 @@ def main():
     display_sidebar(components, settings)
 
     # Display user info in sidebar
-    display_user_info_sidebar()
+    display_user_info_sidebar(components)
 
     # --- Load Chat History ---
     load_chat_history(components["query_ops"], user_id=st.session_state.user_id)

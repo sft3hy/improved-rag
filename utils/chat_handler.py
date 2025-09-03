@@ -16,7 +16,6 @@ def load_chat_history(query_ops, user_id):
     try:
         st.session_state.messages = []
         user_queries = query_ops.get_user_queries(limit=100, user_id=user_id)
-        all_queries = query_ops.get_all_queries(limit=100)
         for query_data in user_queries:
             st.session_state.messages.append(
                 {"role": "user", "content": query_data["user_query"]}

@@ -85,8 +85,8 @@ def authenticate():
     # Use query params to handle logout
     query_params = st.query_params
     if query_params.get("logout") == "true":
-        st.query_params.clear()
-        st.logout()
+        st.logout()  # This will clear session state and redirect
+        st.stop()  # Prevent further execution
 
     # Render dropdown with profile + info + logout link
     st.markdown(

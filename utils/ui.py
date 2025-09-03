@@ -12,6 +12,7 @@ from utils.jira_connector import (
 )
 from datetime import datetime
 from config.settings import settings
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +82,26 @@ def display_sources(sources):
 def display_jira_login():
     """Display JIRA login interface."""
     st.subheader("🔗 Connect to JIRA")
+    # Auto-reconnect if credentials are stored but connection is lost
+    if (
+        not st.session_state.get("jira_authenticated", False)
+        and st.session_state.get("jira_url")
+        and st.session_state.get("jira_email")
+        and st.session_state.get("jira_token")
+    ):
 
+        with st.spinner("Reconnecting to JIRA..."):
+            connector = JiraConnector()
+            if connector.authenticate(
+                st.session_state.jira_url,
+                st.session_state.jira_email,
+                st.session_state.jira_token,
+            ):
+                st.session_state.jira_connector = connector
+                st.session_state.jira_authenticated = True
+                st.session_state.jira_user_info = connector.get_user_info()
+                st.success("🔄 Auto-reconnected to JIRA!")
+                st.rerun()
     with st.expander(
         "JIRA Connection",
         expanded=not st.session_state.get("jira_authenticated", False),
@@ -122,6 +142,10 @@ def display_jira_login():
                             st.session_state.jira_authenticated = True
                             st.session_state.jira_user_info = connector.get_user_info()
                             st.success("✅ Successfully connected to JIRA!")
+                            # Store JIRA credentials for session persistence
+                            st.session_state.jira_url = jira_url
+                            st.session_state.jira_email = jira_email
+                            st.session_state.jira_token = jira_token
                             st.rerun()
                         else:
                             st.error(
@@ -143,6 +167,10 @@ def display_jira_login():
                     "jira_user_info",
                     "jira_projects",
                     "jira_issues",
+                    "jira_selected_issues",
+                    "jira_url",
+                    "jira_email",
+                    "jira_token",
                 ]:
                     if key in st.session_state:
                         del st.session_state[key]
@@ -491,11 +519,72 @@ def display_sidebar(components, settings):
             )
             if user_docs:
                 st.metric("Total Documents", len(user_docs))
-                for doc in user_docs[:10]:
-                    status = "✅" if doc["processed"] else "⏳"
-                    emoji = get_file_type_emoji(doc.get("file_type", ""))
-                    size = format_file_size(doc.get("file_size", 0))
-                    st.caption(f"{status} {emoji} {doc['document_name']} ({size})")
+
+                # Display documents with delete functionality
+                for i, doc in enumerate(user_docs[:10]):
+                    col1, col2 = st.columns([6, 1])
+
+                    with col1:
+                        status = "✅" if doc["processed"] else "⏳"
+                        emoji = get_file_type_emoji(doc.get("file_type", ""))
+                        size = format_file_size(doc.get("file_size", 0))
+
+                        # Create a nice document card layout
+                        st.markdown(
+                            f"""
+                        <div style="
+                            background-color: var(--background-color);
+                            border: 1px solid var(--border-color);
+                            border-radius: 8px;
+                            padding: 12px;
+                            margin: 4px 0;
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                        ">
+                            <span style="font-size: 1.2em;">{status} {emoji}</span>
+                            <div>
+                                <strong>{doc['document_name']}</strong><br>
+                                <small style="color: var(--text-color-secondary);">{size}</small>
+                            </div>
+                        </div>
+                        """,
+                            unsafe_allow_html=True,
+                        )
+
+                    with col2:
+                        # Delete button
+                        if st.button("🗑️", key=f"delete_{i}", help="Delete document"):
+                            # Store the document ID to delete in session state
+                            st.session_state.doc_to_delete = doc.get(
+                                "id", doc.get("document_id")
+                            )
+                            st.rerun()
+
+                # Handle deletion confirmation
+                if hasattr(st.session_state, "doc_to_delete"):
+                    st.warning("⚠️ Are you sure you want to delete this document?")
+                    col1, col2, col3 = st.columns([1, 1, 1])
+
+                    with col1:
+                        if st.button("✅ Yes", key="confirm_delete_document"):
+                            try:
+                                # Call your delete function here
+                                components["doc_ops"].delete_document(
+                                    st.session_state.doc_to_delete
+                                )
+                                st.toast("Document deleted successfully!")
+                                del st.session_state.doc_to_delete
+                                time.sleep(3)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error deleting document: {e}")
+
+                    with col2:
+                        if st.button("❌ No", key="cancel_delete_document"):
+                            del st.session_state.doc_to_delete
+                            st.rerun()
+
                 if len(user_docs) > 10:
                     st.caption(f"... and {len(user_docs) - 10} more documents")
             else:
@@ -557,6 +646,7 @@ Description: {description}
 
 def display_chat_messages(model_name):
     """Displays the chat message history."""
+    # with st.expander("Historical chat messages"):
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.write(message["content"])
@@ -567,3 +657,91 @@ def display_chat_messages(model_name):
                 st.caption(
                     f"🧠 Model: {model_name} | ⏱️ Response time: {time_info}s | 🔢 Tokens: {tokens_info}"
                 )
+
+
+def display_user_info_sidebar(components):
+    """Display user information in sidebar."""
+    if hasattr(st.session_state, "user_info") and st.session_state.user_info:
+        with st.sidebar:
+            st.divider()
+
+            st.subheader("👤 User Profile")
+
+            user_info = st.session_state.user_info
+
+            # Display user basic info
+            st.write(f"**Email:** {user_info.get('email', 'Unknown')}")
+            if user_info.get("display_name"):
+                st.write(f"**Name:** {user_info['display_name']}")
+
+            # Display user stats
+            activity_stats = st.session_state.components[
+                "user_ops"
+            ].get_user_activity_stats(st.session_state.user_id)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Documents", activity_stats["document_count"])
+                st.metric("Total Queries", activity_stats["total_queries"])
+            with col2:
+                st.metric("Today's Tokens", activity_stats["today_tokens"])
+                st.metric("Total Tokens", activity_stats["total_tokens"])
+
+            # Initialize session state for delete confirmation
+            if "show_delete_confirmation" not in st.session_state:
+                st.session_state.show_delete_confirmation = False
+
+            del_queries = st.button("Delete all Queries", type="primary")
+            if del_queries:
+                st.session_state.show_delete_confirmation = True
+
+            # Show confirmation dialog if needed
+            if st.session_state.show_delete_confirmation:
+                st.warning("⚠️ Are you sure you want to delete all your queries?")
+                col1, col2, col3 = st.columns([1, 1, 1])
+
+                with col1:
+                    if st.button(
+                        "Delete all queries",
+                        key="confirm_delete_queries",
+                        type="primary",
+                    ):
+                        try:
+                            print(st.session_state.user_id)
+                            # Call your delete function here
+                            components["query_ops"].delete_user_queries(
+                                st.session_state.user_id
+                            )
+                            st.toast("All queries cleared!")
+                            # Reset the confirmation state
+                            st.session_state.show_delete_confirmation = False
+                            st.session_state.messages = []
+                            time.sleep(1)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error deleting queries: {e}")
+                            st.session_state.show_delete_confirmation = False
+
+                with col2:
+                    if st.button("Back to safety", key="cancel_delete_queries"):
+                        # Reset the confirmation state
+                        st.session_state.show_delete_confirmation = False
+                        st.rerun()
+
+            # Show recent activity
+            if activity_stats["recent_activity"]:
+                st.write("**Recent Activity (7 days):**")
+                for date, count in activity_stats["recent_activity"][
+                    :3
+                ]:  # Show last 3 days
+                    st.write(f"• {date}: {count} queries")
+
+            first_login = user_info.get("first_login", "Unknown")
+            if isinstance(first_login, datetime):
+                first_login_str = first_login.strftime("%Y-%m-%d")
+            elif first_login != "Unknown":
+                first_login_str = str(first_login)[:10]
+            else:
+                first_login_str = "Unknown"
+
+            st.write(f"**Member since:** {first_login_str}")

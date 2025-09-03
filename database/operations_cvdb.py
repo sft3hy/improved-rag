@@ -35,6 +35,44 @@ class DocumentOperations:
                 conn.commit()
                 return document_id
 
+    def delete_document(
+        self,
+        document_id: str,
+    ) -> int:
+        """
+        Deletes a document from the database and returns the number of deleted rows.
+        """
+        conn = None
+        rows_deleted = 0
+        try:
+            conn = self.db_manager.get_connection()
+            cursor = conn.cursor()
+
+            # Use %s for parameter placeholders in psycopg2, not ?
+            # Also, pass parameters as a tuple in the second argument of execute()
+            cursor.execute(
+                """
+                DELETE FROM documents WHERE document_id = %s;
+                """,
+                (document_id,),
+            )
+
+            # Get the number of deleted rows
+            rows_deleted = cursor.rowcount
+
+            conn.commit()
+            cursor.close()
+
+        except Exception as error:
+            print(error)
+            if conn is not None:
+                conn.rollback()
+        finally:
+            if conn is not None:
+                conn.close()
+
+        return rows_deleted
+
     def insert_chunk(
         self,
         document_id: int,
@@ -158,6 +196,16 @@ class QueryOperations:
                 conn.commit()
                 print(f"Deleted query with id {query_id}")
 
+    def delete_user_queries(self, user_id):
+        """Delete all queries by user id."""
+        conn = self.db_manager.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM user_queries WHERE user_id = %s", (user_id,))
+
+        conn.commit()
+        conn.close()
+        print(f"Deleted user queries with id {user_id}")
+
     def insert_query(
         self,
         user_query: str,
@@ -206,7 +254,7 @@ class QueryOperations:
                            timestamp, processing_time, chunks_used, tokens_used
                     FROM user_queries 
                     WHERE user_id = %s
-                    ORDER BY timestamp DESC
+                    ORDER BY timestamp ASC
                     LIMIT %s
                 """,
                     (user_id, limit),
