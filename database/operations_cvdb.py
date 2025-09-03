@@ -403,7 +403,7 @@ class UserOperations:
                 query_count = cursor.fetchone()[0]
 
                 # Get today's token usage
-                today_tokens = self.get_todays_total_tokens(user_id)
+                today_tokens = self.db_manager.get_todays_total_tokens(user_id)
 
                 # Get total token usage
                 cursor.execute(
