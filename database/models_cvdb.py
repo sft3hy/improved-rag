@@ -1,5 +1,5 @@
 import psycopg
-from typing import Optional, Dict, Any
+from typing import Optional
 import os
 
 
@@ -128,7 +128,8 @@ class DatabaseManager:
                         )
                 except Exception as e:
                     # Foreign key might already exist or users table might not exist yet
-                    pass
+                    print(f"Warning: Could not add foreign key constraint: {e}")
+                    # Continue without failing - this is expected on first run
 
                 # Create indexes for better performance
                 cursor.execute(
@@ -153,7 +154,7 @@ class DatabaseManager:
                     "CREATE INDEX IF NOT EXISTS idx_queries_timestamp ON user_queries(timestamp)"
                 )
 
-                conn.commit()
+                # No manual commit needed - context manager handles it
 
     def get_todays_total_tokens(self, user_id: Optional[str] = None) -> int:
         """
