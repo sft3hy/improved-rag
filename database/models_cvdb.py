@@ -18,6 +18,10 @@ class DatabaseManager:
         }
         self.init_database()
 
+    def get_connection(self):
+        """Get database connection."""
+        return psycopg.connect(**self.connection_params)
+
     def init_database(self):
         """Initialize the database with required tables."""
         with psycopg.connect(**self.connection_params) as conn:
@@ -184,43 +188,3 @@ class DatabaseManager:
 
                 total_tokens = cursor.fetchone()[0]
                 return total_tokens
-
-    def get_all_users_summary(self) -> list:
-        """
-        Get a summary of all users for admin purposes.
-
-        Returns:
-            List of dictionaries with user summaries
-        """
-        with self.get_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT u.user_id, u.email, u.display_name, u.first_login, u.last_login,
-                           u.total_queries, u.total_documents, u.is_active,
-                           COALESCE(SUM(uq.tokens_used), 0) as total_tokens
-                    FROM users u
-                    LEFT JOIN user_queries uq ON u.user_id = uq.user_id
-                    GROUP BY u.user_id, u.email, u.display_name, u.first_login, u.last_login,
-                             u.total_queries, u.total_documents, u.is_active
-                    ORDER BY u.last_login DESC
-                    """
-                )
-
-                users = []
-                for row in cursor.fetchall():
-                    users.append(
-                        {
-                            "user_id": row[0],
-                            "email": row[1],
-                            "display_name": row[2],
-                            "first_login": row[3],
-                            "last_login": row[4],
-                            "total_queries": row[5],
-                            "total_documents": row[6],
-                            "is_active": row[7],
-                            "total_tokens": row[8],
-                        }
-                    )
-
-                return users

@@ -375,22 +375,20 @@ def main():
             # Handle normally with enhanced JIRA context
             handle_enhanced_user_query(query, components, model_name)
 
-    # --- Admin Section (Optional) ---
-    # if st.session_state.user_email in [
-    #     "admin@yourcompany.com",
-    #     "your-admin-email@domain.com",
-    # ]:  # Replace with your admin emails
-    #     with st.sidebar:
-    #         if st.expander("🔧 Admin Panel"):
-    #             st.subheader("User Management")
+    if st.session_state.user_email in [
+        "smaueltown@gmail.com",
+    ]:
+        with st.sidebar:
+            with st.expander("🔧 Admin Panel"):
+                st.subheader("User Management")
 
-    #             if st.button("View All Users"):
-    #                 users_summary = components["user_ops"].get_all_users_summary()
-    #                 st.write("**All Users Summary:**")
-    #                 for user in users_summary:
-    #                     st.write(
-    #                         f"• {user['email']} - {user['total_queries']} queries, {user['total_tokens']} tokens"
-    #                     )
+                if st.button("View All Users"):
+                    users_summary = components["user_ops"].get_all_users_summary()
+                    st.write("**All Users Summary:**")
+                    for user in users_summary:
+                        st.write(
+                            f"• {user['email']} - {user['total_queries']} queries, {user['total_tokens']} tokens"
+                        )
 
 
 if __name__ == "__main__":
