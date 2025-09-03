@@ -3,6 +3,7 @@
 import streamlit as st
 import logging
 import traceback
+from datetime import datetime
 
 # Import project modules
 from config.settings import settings
@@ -129,9 +130,15 @@ def display_user_info_sidebar():
                 ]:  # Show last 3 days
                     st.write(f"• {date}: {count} queries")
 
-            st.write(
-                f"**Member since:** {user_info.get('first_login', 'Unknown')[:10]}"
-            )
+            first_login = user_info.get("first_login", "Unknown")
+            if isinstance(first_login, datetime):
+                first_login_str = first_login.strftime("%Y-%m-%d")
+            elif first_login != "Unknown":
+                first_login_str = str(first_login)[:10]
+            else:
+                first_login_str = "Unknown"
+
+            st.write(f"**Member since:** {first_login_str}")
 
 
 def handle_enhanced_user_query(query, components, model_name):
