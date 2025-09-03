@@ -1,7 +1,5 @@
 import sqlite3
-from datetime import datetime, date
-from typing import Optional, List, Dict, Any
-import json
+from typing import Optional, Dict, Any
 
 
 class DatabaseManager:
@@ -9,10 +7,32 @@ class DatabaseManager:
         self.db_path = db_path
         self.init_database()
 
+    def get_connection(self):
+        """Get database connection."""
+        return sqlite3.connect(self.db_path)
+
     def init_database(self):
         """Initialize the database with required tables."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
+
+        # Users table
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                user_id TEXT PRIMARY KEY,
+                email TEXT UNIQUE NOT NULL,
+                display_name TEXT,
+                first_login DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_login DATETIME DEFAULT CURRENT_TIMESTAMP,
+                total_queries INTEGER DEFAULT 0,
+                total_documents INTEGER DEFAULT 0,
+                is_active BOOLEAN DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """
+        )
 
         # Documents table
         cursor.execute(
@@ -25,7 +45,8 @@ class DatabaseManager:
                 upload_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 file_size INTEGER,
                 file_type TEXT,
-                processed BOOLEAN DEFAULT FALSE
+                processed BOOLEAN DEFAULT FALSE,
+                FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
             )
         """
         )
@@ -42,8 +63,8 @@ class DatabaseManager:
                 chunk_type TEXT CHECK(chunk_type IN ('parent', 'child')),
                 embedding BLOB,
                 chunk_index INTEGER,
-                FOREIGN KEY (document_id) REFERENCES documents (document_id),
-                FOREIGN KEY (parent_chunk_id) REFERENCES document_chunks (chunk_id)
+                FOREIGN KEY (document_id) REFERENCES documents (document_id) ON DELETE CASCADE,
+                FOREIGN KEY (parent_chunk_id) REFERENCES document_chunks (chunk_id) ON DELETE CASCADE
             )
         """
         )
@@ -60,7 +81,8 @@ class DatabaseManager:
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 processing_time REAL,
                 chunks_used INTEGER,
-                tokens_used INTEGER DEFAULT 0
+                tokens_used INTEGER DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
             )
         """
         )
@@ -75,6 +97,10 @@ class DatabaseManager:
             pass
 
         # Create indexes for better performance
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_users_last_login ON users(last_login)"
+        )
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_documents_user_id ON documents(user_id)"
         )
@@ -93,10 +119,6 @@ class DatabaseManager:
 
         conn.commit()
         conn.close()
-
-    def get_connection(self):
-        """Get database connection."""
-        return sqlite3.connect(self.db_path)
 
     def get_todays_total_tokens(self, user_id: Optional[str] = None) -> int:
         """
@@ -129,9 +151,50 @@ class DatabaseManager:
                 WHERE DATE(timestamp, 'localtime') = DATE('now', 'localtime')
                 """
             )
-        # print(cursor.fetchall())
+
         total_tokens = cursor.fetchone()[0]
         conn.close()
-        # print(total_tokens)
 
         return total_tokens
+
+    def get_all_users_summary(self) -> list:
+        """
+        Get a summary of all users for admin purposes.
+
+        Returns:
+            List of dictionaries with user summaries
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT u.user_id, u.email, u.display_name, u.first_login, u.last_login,
+                   u.total_queries, u.total_documents, u.is_active,
+                   COALESCE(SUM(uq.tokens_used), 0) as total_tokens
+            FROM users u
+            LEFT JOIN user_queries uq ON u.user_id = uq.user_id
+            GROUP BY u.user_id, u.email, u.display_name, u.first_login, u.last_login,
+                     u.total_queries, u.total_documents, u.is_active
+            ORDER BY u.last_login DESC
+            """
+        )
+
+        users = []
+        for row in cursor.fetchall():
+            users.append(
+                {
+                    "user_id": row[0],
+                    "email": row[1],
+                    "display_name": row[2],
+                    "first_login": row[3],
+                    "last_login": row[4],
+                    "total_queries": row[5],
+                    "total_documents": row[6],
+                    "is_active": row[7],
+                    "total_tokens": row[8],
+                }
+            )
+
+        conn.close()
+        return users

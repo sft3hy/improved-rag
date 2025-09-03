@@ -11,11 +11,15 @@ from config.settings import settings
 # Conditional imports based on TEST flag
 if settings.TEST == "True":
     from database.models import DatabaseManager
-    from database.operations import DocumentOperations, QueryOperations
+    from database.operations import DocumentOperations, QueryOperations, UserOperations
     from rag.llm_client import GroqLLMClient as LLMClient
 else:
     from database.models_cvdb import DatabaseManager
-    from database.operations_cvdb import DocumentOperations, QueryOperations
+    from database.operations_cvdb import (
+        DocumentOperations,
+        QueryOperations,
+        UserOperations,
+    )
     from rag.llm_client import SanctuaryLLMClient as LLMClient
 
 from rag.embeddings import EmbeddingManager
@@ -43,6 +47,7 @@ def initialize_system():
 
         doc_ops = DocumentOperations(db_manager)
         query_ops = QueryOperations(db_manager)
+        user_ops = UserOperations(db_manager)
         embedding_manager = EmbeddingManager(settings.EMBEDDING_MODEL)
         document_chunker = DocumentChunker(
             child_chunk_size=settings.CHILD_CHUNK_SIZE,
@@ -61,6 +66,7 @@ def initialize_system():
             "db_manager": db_manager,
             "doc_ops": doc_ops,
             "query_ops": query_ops,
+            "user_ops": user_ops,
             "embedding_manager": embedding_manager,
             "document_chunker": document_chunker,
             "llm_client": llm_client,

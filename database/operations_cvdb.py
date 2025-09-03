@@ -277,6 +277,167 @@ class QueryOperations:
         return self.db_manager.get_todays_total_tokens(user_id)
 
 
+class UserOperations:
+    def __init__(self, db_manager: DatabaseManager):
+        self.db_manager = db_manager
+
+    def get_connection(self):
+        """Get database connection."""
+        return psycopg.connect(**self.connection_params)
+
+    def create_or_update_user(
+        self, email: str, display_name: Optional[str] = None
+    ) -> str:
+        """
+        Create a new user or update existing user's last login.
+
+        Args:
+            email: User's email address
+            display_name: User's display name (optional)
+
+        Returns:
+            user_id: The user's ID (same as email in this implementation)
+        """
+        user_id = email  # Using email as user_id for simplicity
+
+        with self.get_connection() as conn:
+            with conn.cursor() as cursor:
+                # Try to insert new user, or update last_login if exists
+                cursor.execute(
+                    """
+                    INSERT INTO users (user_id, email, display_name, first_login, last_login)
+                    VALUES (%s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT (user_id) 
+                    DO UPDATE SET 
+                        last_login = CURRENT_TIMESTAMP,
+                        display_name = COALESCE(EXCLUDED.display_name, users.display_name),
+                        updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (user_id, email, display_name),
+                )
+                conn.commit()
+
+        return user_id
+
+    def get_user_info(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get user information.
+
+        Args:
+            user_id: User's ID
+
+        Returns:
+            Dictionary with user information or None if not found
+        """
+        with self.get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT user_id, email, display_name, first_login, last_login,
+                           total_queries, total_documents, is_active, created_at, updated_at
+                    FROM users 
+                    WHERE user_id = %s
+                    """,
+                    (user_id,),
+                )
+                row = cursor.fetchone()
+
+                if row:
+                    return {
+                        "user_id": row[0],
+                        "email": row[1],
+                        "display_name": row[2],
+                        "first_login": row[3],
+                        "last_login": row[4],
+                        "total_queries": row[5],
+                        "total_documents": row[6],
+                        "is_active": row[7],
+                        "created_at": row[8],
+                        "updated_at": row[9],
+                    }
+                return None
+
+    def update_user_stats(
+        self, user_id: str, increment_queries: int = 0, increment_documents: int = 0
+    ):
+        """
+        Update user statistics.
+
+        Args:
+            user_id: User's ID
+            increment_queries: Number to add to total_queries
+            increment_documents: Number to add to total_documents
+        """
+        with self.get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE users 
+                    SET total_queries = total_queries + %s,
+                        total_documents = total_documents + %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE user_id = %s
+                    """,
+                    (increment_queries, increment_documents, user_id),
+                )
+                conn.commit()
+
+    def get_user_activity_stats(self, user_id: str) -> Dict[str, Any]:
+        """
+        Get detailed activity statistics for a user.
+
+        Args:
+            user_id: User's ID
+
+        Returns:
+            Dictionary with activity statistics
+        """
+        with self.get_connection() as conn:
+            with conn.cursor() as cursor:
+                # Get document count
+                cursor.execute(
+                    "SELECT COUNT(*) FROM documents WHERE user_id = %s", (user_id,)
+                )
+                doc_count = cursor.fetchone()[0]
+
+                # Get query count
+                cursor.execute(
+                    "SELECT COUNT(*) FROM user_queries WHERE user_id = %s", (user_id,)
+                )
+                query_count = cursor.fetchone()[0]
+
+                # Get today's token usage
+                today_tokens = self.get_todays_total_tokens(user_id)
+
+                # Get total token usage
+                cursor.execute(
+                    "SELECT COALESCE(SUM(tokens_used), 0) FROM user_queries WHERE user_id = %s",
+                    (user_id,),
+                )
+                total_tokens = cursor.fetchone()[0]
+
+                # Get recent activity (last 7 days)
+                cursor.execute(
+                    """
+                    SELECT DATE(timestamp) as query_date, COUNT(*) as query_count
+                    FROM user_queries 
+                    WHERE user_id = %s AND timestamp >= CURRENT_DATE - INTERVAL '7 days'
+                    GROUP BY DATE(timestamp)
+                    ORDER BY query_date DESC
+                    """,
+                    (user_id,),
+                )
+                recent_activity = cursor.fetchall()
+
+                return {
+                    "document_count": doc_count,
+                    "total_queries": query_count,
+                    "today_tokens": today_tokens,
+                    "total_tokens": total_tokens,
+                    "recent_activity": recent_activity,
+                }
+
+
 class AdminOperations:
     def __init__(self, db_manager: DatabaseManager):
         self.db_manager = db_manager

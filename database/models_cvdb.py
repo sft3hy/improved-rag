@@ -1,6 +1,5 @@
 import psycopg
-from datetime import datetime, date
-from typing import Optional, List, Dict, Any
+from typing import Optional, Dict, Any
 import os
 
 
@@ -23,6 +22,24 @@ class DatabaseManager:
         """Initialize the database with required tables."""
         with psycopg.connect(**self.connection_params) as conn:
             with conn.cursor() as cursor:
+                # Users table
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS users (
+                        user_id TEXT PRIMARY KEY,
+                        email TEXT UNIQUE NOT NULL,
+                        display_name TEXT,
+                        first_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_login TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        total_queries INTEGER DEFAULT 0,
+                        total_documents INTEGER DEFAULT 0,
+                        is_active BOOLEAN DEFAULT TRUE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """
+                )
+
                 # Documents table
                 cursor.execute(
                     """
@@ -34,7 +51,8 @@ class DatabaseManager:
                         upload_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         file_size INTEGER,
                         file_type TEXT,
-                        processed BOOLEAN DEFAULT FALSE
+                        processed BOOLEAN DEFAULT FALSE,
+                        FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
                     )
                 """
                 )
@@ -51,8 +69,8 @@ class DatabaseManager:
                         chunk_type TEXT CHECK(chunk_type IN ('parent', 'child')),
                         embedding BYTEA,
                         chunk_index INTEGER,
-                        FOREIGN KEY (document_id) REFERENCES documents (document_id),
-                        FOREIGN KEY (parent_chunk_id) REFERENCES document_chunks (chunk_id)
+                        FOREIGN KEY (document_id) REFERENCES documents (document_id) ON DELETE CASCADE,
+                        FOREIGN KEY (parent_chunk_id) REFERENCES document_chunks (chunk_id) ON DELETE CASCADE
                     )
                 """
                 )
@@ -69,7 +87,8 @@ class DatabaseManager:
                         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         processing_time REAL,
                         chunks_used INTEGER,
-                        tokens_used INTEGER DEFAULT 0
+                        tokens_used INTEGER DEFAULT 0,
+                        FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
                     )
                 """
                 )
@@ -87,7 +106,33 @@ class DatabaseManager:
                         "ALTER TABLE user_queries ADD COLUMN tokens_used INTEGER DEFAULT 0"
                     )
 
+                # Check if foreign key constraints exist and add them if they don't
+                # Note: This is a simplified check - in production you might want more robust migration handling
+                try:
+                    cursor.execute(
+                        """
+                        SELECT constraint_name FROM information_schema.table_constraints 
+                        WHERE table_name='documents' AND constraint_type='FOREIGN KEY'
+                        """
+                    )
+                    fk_constraints = cursor.fetchall()
+                    if not any(
+                        "user" in str(constraint) for constraint in fk_constraints
+                    ):
+                        cursor.execute(
+                            "ALTER TABLE documents ADD CONSTRAINT fk_documents_user FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE"
+                        )
+                except Exception as e:
+                    # Foreign key might already exist or users table might not exist yet
+                    pass
+
                 # Create indexes for better performance
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_users_last_login ON users(last_login)"
+                )
                 cursor.execute(
                     "CREATE INDEX IF NOT EXISTS idx_documents_user_id ON documents(user_id)"
                 )
@@ -105,10 +150,6 @@ class DatabaseManager:
                 )
 
                 conn.commit()
-
-    def get_connection(self):
-        """Get database connection."""
-        return psycopg.connect(**self.connection_params)
 
     def get_todays_total_tokens(self, user_id: Optional[str] = None) -> int:
         """
@@ -143,3 +184,43 @@ class DatabaseManager:
 
                 total_tokens = cursor.fetchone()[0]
                 return total_tokens
+
+    def get_all_users_summary(self) -> list:
+        """
+        Get a summary of all users for admin purposes.
+
+        Returns:
+            List of dictionaries with user summaries
+        """
+        with self.get_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT u.user_id, u.email, u.display_name, u.first_login, u.last_login,
+                           u.total_queries, u.total_documents, u.is_active,
+                           COALESCE(SUM(uq.tokens_used), 0) as total_tokens
+                    FROM users u
+                    LEFT JOIN user_queries uq ON u.user_id = uq.user_id
+                    GROUP BY u.user_id, u.email, u.display_name, u.first_login, u.last_login,
+                             u.total_queries, u.total_documents, u.is_active
+                    ORDER BY u.last_login DESC
+                    """
+                )
+
+                users = []
+                for row in cursor.fetchall():
+                    users.append(
+                        {
+                            "user_id": row[0],
+                            "email": row[1],
+                            "display_name": row[2],
+                            "first_login": row[3],
+                            "last_login": row[4],
+                            "total_queries": row[5],
+                            "total_documents": row[6],
+                            "is_active": row[7],
+                            "total_tokens": row[8],
+                        }
+                    )
+
+                return users
