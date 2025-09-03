@@ -296,7 +296,7 @@ class UserOperations:
         """
         user_id = email  # Using email as user_id for simplicity
 
-        with self.get_connection() as conn:
+        with self.db_manager.get_connection() as conn:
             with conn.cursor() as cursor:
                 # Try to insert new user, or update last_login if exists
                 cursor.execute(
@@ -325,7 +325,7 @@ class UserOperations:
         Returns:
             Dictionary with user information or None if not found
         """
-        with self.get_connection() as conn:
+        with self.db_manager.get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
                     """
@@ -364,7 +364,7 @@ class UserOperations:
             increment_queries: Number to add to total_queries
             increment_documents: Number to add to total_documents
         """
-        with self.get_connection() as conn:
+        with self.db_manager.get_connection() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
                     """
@@ -388,7 +388,7 @@ class UserOperations:
         Returns:
             Dictionary with activity statistics
         """
-        with self.get_connection() as conn:
+        with self.db_manager.get_connection() as conn:
             with conn.cursor() as cursor:
                 # Get document count
                 cursor.execute(
