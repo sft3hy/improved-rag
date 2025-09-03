@@ -1,5 +1,5 @@
 import psycopg
-from typing import Optional
+from typing import Optional, Dict, Any
 import os
 
 
@@ -110,26 +110,44 @@ class DatabaseManager:
                         "ALTER TABLE user_queries ADD COLUMN tokens_used INTEGER DEFAULT 0"
                     )
 
-                # Check if foreign key constraints exist and add them if they don't
-                # Note: This is a simplified check - in production you might want more robust migration handling
+                # Handle foreign key constraints - need to ensure referential integrity first
                 try:
                     cursor.execute(
                         """
                         SELECT constraint_name FROM information_schema.table_constraints 
                         WHERE table_name='documents' AND constraint_type='FOREIGN KEY'
+                        AND constraint_name = 'fk_documents_user'
                         """
                     )
-                    fk_constraints = cursor.fetchall()
-                    if not any(
-                        "user" in str(constraint) for constraint in fk_constraints
-                    ):
+                    fk_exists = cursor.fetchone()
+
+                    if not fk_exists:
+                        # First, create default user for any orphaned documents
+                        cursor.execute(
+                            """
+                            INSERT INTO users (user_id, email, display_name)
+                            VALUES ('default_user', 'default_user@system.local', 'System Default User')
+                            ON CONFLICT (user_id) DO NOTHING
+                            """
+                        )
+
+                        # Handle case where email might conflict with existing user
+                        cursor.execute(
+                            """
+                            INSERT INTO users (user_id, email, display_name)
+                            VALUES ('default_user', 'default_user@system.local', 'System Default User')
+                            ON CONFLICT (email) DO NOTHING
+                            """
+                        )
+
+                        # Now we can safely add the foreign key constraint
                         cursor.execute(
                             "ALTER TABLE documents ADD CONSTRAINT fk_documents_user FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE"
                         )
+
                 except Exception as e:
-                    # Foreign key might already exist or users table might not exist yet
                     print(f"Warning: Could not add foreign key constraint: {e}")
-                    # Continue without failing - this is expected on first run
+                    # Continue without failing - the constraint might already exist with a different name
 
                 # Create indexes for better performance
                 cursor.execute(
