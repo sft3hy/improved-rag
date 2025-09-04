@@ -56,11 +56,12 @@ def authenticate():
         .dropdown-content::before {
             content: '';
             position: absolute;
-            top: -5px;
-            right: 15px;
-            width: 40px;
-            height: 10px;
+            top: -1rem; /* Larger gap coverage */
+            left: 0; /* Cover the full width */
+            right: 0;
+            height: 1rem;
             background: transparent;
+            pointer-events: auto;
         }
         .logout-button {
             margin-top: 12px;
